@@ -21,6 +21,25 @@ struct obstructions
   set<unsigned char> obstructing_object_balls;
 };
 
+/**
+ * Tangent line information
+ */
+struct tangent_line
+{
+  enum FollowDirection {
+    CLOCKWISE,
+    COUNTER_CLOCKWISE
+  };
+  // The direction from the tangent line for the path if the cue ball is hit with follow.
+  FollowDirection follow_direction;
+  // The tangent line direction. It is a unit vector.
+  Vector2d tangent_line_direction;
+  // The origin point of the tangent line. Usually equal to the ghost ball contact point.
+  Vector2d origin;
+  // The pocket direction. It is a unit vector.
+  Vector2d pocket_direction;
+};
+
 std::ostream &operator<<(std::ostream &o, const obstructions &obstructions)
 {
   o << "Permanent obstruction: " << obstructions.has_permanent_obstruction << endl;
@@ -37,7 +56,7 @@ struct shot_path
   // The line segments that make up the shot path.
   vector<Vector2d> path_segments;
   // The obstructions along this path.
-  obstructions obstructions;
+  obstructions shot_obstructions;
   // The final location of the cue ball along this path.
   Vector2d final_position;
 };
@@ -46,13 +65,13 @@ struct shot_path
 struct shot_info
 {
   float difficulty = 0;      // TODO: Make this more efficient.
-  obstructions obstructions; // THe obstructions for this shot.
+  obstructions shot_obstructions; // The obstructions for this shot.
 };
 
 std::ostream &operator<<(std::ostream &o, const shot_info &shot_info)
 {
   o << shot_info.difficulty << endl;
-  o << shot_info.obstructions << endl;
+  o << shot_info.shot_obstructions << endl;
   return o;
 }
 
@@ -84,6 +103,8 @@ Vector2d cue_ball;
 vector<Vector2d> object_balls;
 // The initial position of our opponent's object balls.
 vector<Vector2d> opponent_object_balls;
+// The lines representing the edges of the table.
+vector< Hyperplane<float,2> > table_edges;
 
 /**
  * A table of obstructions from each object ball index to a given pocket. Includes the 8 ball at index
@@ -119,6 +140,21 @@ void initialize_pockets()
   pockets.push_back(Vector2d(WIDTH, LENGTH));
 }
 
+Vector2f toVector2f(Vector2d vec) {
+  return Vector2f(vec.x(), vec.y());
+}
+
+/**
+ * Initialize the edges of the table.
+ */
+void initialize_table_edges()
+{
+  table_edges.push_back(Hyperplane<float,2>::Through(toVector2f(pockets[0]), toVector2f(pockets[1])));
+  table_edges.push_back(Hyperplane<float,2>::Through(toVector2f(pockets[1]), toVector2f(pockets[5])));
+  table_edges.push_back(Hyperplane<float,2>::Through(toVector2f(pockets[5]), toVector2f(pockets[4])));
+  table_edges.push_back(Hyperplane<float,2>::Through(toVector2f(pockets[4]), toVector2f(pockets[0])));
+}
+
 /**
  * Returns true if the point p interescts the given segment specified by the start and end points.
  * TODO: Might never be used.
@@ -138,7 +174,6 @@ bool point_intersects_segment(Vector2d p, Vector2d segment_start, Vector2d segme
 double distance_from_point_to_segment(Vector2d p, Vector2d segment_start, Vector2d segment_end)
 {
   Vector2d start_to_point = p - segment_start;
-  Vector2d end_to_point = p - segment_end;
   Vector2d start_to_end = segment_end - segment_start;
   const float segment_length_squared = start_to_end.squaredNorm();
   const float t = start_to_point.dot(start_to_end) / segment_length_squared;
@@ -237,6 +272,17 @@ void populate_ghost_ball_position_table()
   }
 }
 
+/**
+ * Modifies set 1 by adding all the elements from set 2.
+ * TODO: Untested.
+ */
+void insert_into_set(set<unsigned char> &set1, set<unsigned char> &set2) {
+  for (unsigned char index : set2)
+  {
+    set1.insert(index);
+  }
+}
+
 void populate_shot_info_table_obstructions()
 {
   for (unsigned char o = 0; o < EIGHT_BALL_INDEX + 1; ++o)
@@ -250,7 +296,7 @@ void populate_shot_info_table_obstructions()
         for (unsigned char l = 0; l < LENGTH; ++l)
         {
           shot_info &shot_info = shot_info_table[w][l][o][p];
-          shot_info.obstructions = ball_to_pocket_obstructions;
+          shot_info.shot_obstructions = ball_to_pocket_obstructions;
           if (ball_to_pocket_obstructions.has_permanent_obstruction)
           {
             continue;
@@ -259,14 +305,11 @@ void populate_shot_info_table_obstructions()
           obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position);
           if (cue_to_object_obstructions.has_permanent_obstruction)
           {
-            shot_info.obstructions.has_permanent_obstruction = true;
-            shot_info.obstructions.obstructing_object_balls.clear();
+            shot_info.shot_obstructions.has_permanent_obstruction = true;
+            shot_info.shot_obstructions.obstructing_object_balls.clear();
             continue;
           }
-          for (unsigned char index : cue_to_object_obstructions.obstructing_object_balls)
-          {
-            shot_info.obstructions.obstructing_object_balls.insert(index);
-          }
+          insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
         }
       }
     }
@@ -313,20 +356,52 @@ void populate_shot_info_table_difficulty()
 
 /**
  * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket.
- * TODO: This function needs to be modified to specify the direction the cue ball is traveling
- * relative to the shot path to determine the follow or draw path for further calculations.
  */
-Vector2d get_tangent_line(Vector2d cue_ball, Vector2d ghost_ball, Vector2d pocket)
+tangent_line get_tangent_line(Vector2d cue_ball, Vector2d ghost_ball, Vector2d pocket)
 {
+  tangent_line tangent;
+  tangent.origin = ghost_ball;
   Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
   Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
+  tangent.pocket_direction = ghost_ball_to_pocket.normalized();
   float determinant = ghost_ball_to_cue_ball.x() * ghost_ball_to_pocket.y() - ghost_ball_to_cue_ball.y() * ghost_ball_to_pocket.x();
-  Vector2d tangent = ghost_ball_to_pocket.unitOrthogonal();
+  Vector2d tangent_line_direction = ghost_ball_to_pocket.unitOrthogonal();
   if (determinant < 0)
   {
-    tangent = Vector2d(-1 * tangent.x(), -1 * tangent.y());
+    tangent.follow_direction = tangent_line::COUNTER_CLOCKWISE;
+    tangent.tangent_line_direction = Vector2d(-1 * tangent_line_direction.x(), -1 * tangent_line_direction.y());
+  } else {
+    tangent.follow_direction = tangent_line::CLOCKWISE;
+    tangent.tangent_line_direction = tangent_line_direction;
   }
   return tangent;
+}
+
+/**
+ * Gets the intersection of a line segment with the edges of the table.
+ */
+void get_intersection_with_table_edges(Vector2d segment_start, Vector2d segment_end) {
+
+  Hyperplane<float,2> segment = Hyperplane<float,2>::Through(toVector2f(segment_start), toVector2f(segment_end);
+
+  for (unsigned char i = 0; i < table_edges.size(); ++i) {
+    std::cout << "Intersection:\n" << segment.intersection(table_edges[0]) << '\n';
+  }
+}
+/**
+ * Gets the path given the tangent line, a strength, and a spin.
+ * TODO: This is just a hack right now.
+ */
+vector<Vector2d> get_path(tangent_line tangent, unsigned char strength, unsigned char spin)
+{
+  vector<Vector2d> ret;
+  Vector2d initial_end_point = (tangent.tangent_line_direction * strength * DIAMOND_LENGTH / 2) + tangent.origin;
+
+  ret.push_back(tangent.origin);
+  ret.push_back(tangent.origin);
+  ret.push_back(tangent.origin);
+  ret.push_back(initial_end_point);
+  return ret;
 }
 
 void populate_shot_path_table()
@@ -340,14 +415,26 @@ void populate_shot_path_table()
       {
         for (unsigned char l = 0; l < LENGTH; ++l)
         {
-          Vector2d tangent_line = get_tangent_line(Vector2d(w, l), ghost_ball_position, pockets[p]);
+          tangent_line tangent = get_tangent_line(Vector2d(w, l), ghost_ball_position, pockets[p]);
           for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
           {
             for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
             {
+              shot_path& current_shot_path = shot_path_table[w][l][o][p][st][sp];
               if (shot_info_table[w][l][o][p].difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
               {
                 continue;
+              }
+              vector<Vector2d> path = get_path(tangent, st, sp);
+              current_shot_path.path_segments = path;
+              current_shot_path.final_position = path[path.size() - 1];
+              for (unsigned char pa = 0; pa < path.size() - 1; ++pa) {
+                obstructions obstructions_on_segment = get_obstructions_on_segment_for_shot(o, path[pa], path[pa + 1]);
+                if (obstructions_on_segment.has_permanent_obstruction) {
+                  current_shot_path.shot_obstructions.has_permanent_obstruction = true;
+                  break;
+                }
+                insert_into_set(current_shot_path.shot_obstructions.obstructing_object_balls, obstructions_on_segment.obstructing_object_balls);
               }
             }
           }
@@ -366,6 +453,7 @@ void populate_shot_info_table()
 
 int main()
 {
+  cout << endl;
   auto start = std::chrono::system_clock::now();
 
   eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH);
@@ -377,12 +465,11 @@ int main()
   }
 
   initialize_pockets();
+  initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
   populate_shot_info_table();
 
-  cout << "AAAA" << endl
-       << get_tangent_line(Vector2d(2, 1), Vector2d(0, 0), Vector2d(-2, -2)) << endl;
   auto end = std::chrono::system_clock::now();
 
   // for (unsigned char o = 0; o < EIGHT_BALL_INDEX + 1; ++o)
@@ -404,6 +491,6 @@ int main()
   std::chrono::duration<double> elapsed_seconds = end - start;
   std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-  std::cout << "finished computation at " << std::ctime(&end_time)
+  std::cout << endl << "finished computation at " << std::ctime(&end_time)
             << "elapsed time: " << elapsed_seconds.count() << "s\n";
 }

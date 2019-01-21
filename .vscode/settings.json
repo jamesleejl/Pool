@@ -1,6 +1,8 @@
 {
   "python.pythonPath": "/usr/local/opt/python/bin/python3.7",
   "files.associations": {
-    "vector": "cpp"
+    "vector": "cpp",
+    "dense": "cpp",
+    "iostream": "cpp"
   }
 }
