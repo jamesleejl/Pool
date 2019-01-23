@@ -39,6 +39,8 @@ struct rail_reflection_struct
   Vector2d intersection_point;
   // The new end point of the segment after bouncing off any rail of the pool table.
   Vector2d end_point;
+  // The distance the ball traveled along this path after hitting the rail to get to the end point.
+  float distance_traveled_after_rail;
 };
 
 /**
@@ -53,9 +55,9 @@ struct segment_range_struct
 };
 
 /**
- * Tangent line information
+ * Information about shot angles such as the tangent line.
  */
-struct tangent_line
+struct shot_angle_struct
 {
   enum FollowDirection {
     CLOCKWISE,
@@ -69,6 +71,8 @@ struct tangent_line
   Vector2d origin;
   // The pocket direction. It is a unit vector.
   Vector2d pocket_direction;
+  // The proportion of the initial cue ball distance that the cue ball will travel at after contact.
+  float fractional_distance;
 };
 
 struct shot_path
@@ -84,7 +88,7 @@ struct shot_path
 // The possible information with regards to a shot
 struct shot_info
 {
-  float difficulty = 0;      // TODO: Make this more efficient.
+  float difficulty = 0;
   obstructions shot_obstructions; // The obstructions for this shot.
 };
 
@@ -106,8 +110,8 @@ const unsigned char WIDTH = DIAMOND_LENGTH * 4;
 const unsigned char LENGTH = WIDTH * 2;
 // The number of pockets.
 const unsigned char NUM_POCKETS = 6;
-// The index number of the 8 ball.
-const unsigned char EIGHT_BALL_INDEX = 7;
+// The maximum number of diamonds the cue ball can travel if untouched by an object ball.
+const unsigned char MAX_DIAMONDS = 30;
 // The positions of the pockets.
 vector<Vector2d> pockets;
 // The position of the eight ball.
@@ -129,24 +133,24 @@ vector<Vector2d> left_edge;
 
 /**
  * A table of obstructions from each object ball index to a given pocket. Includes the 8 ball at index
- * EIGHT_BALL_INDEX. This is only used to help populate shot_obstructions.
+ * object_balls.size() + 1. This is only used to help populate shot_obstructions.
  */
-obstructions ball_to_pocket_obstructions_table[EIGHT_BALL_INDEX + 1][NUM_POCKETS];
+vector<vector<obstructions>> ball_to_pocket_obstructions_table;
 
 /**
  * A table of ghost ball positions for a given object ball index to a pocket.
  */
-Vector2d ghost_ball_position_table[EIGHT_BALL_INDEX + 1][NUM_POCKETS];
+vector<vector<Vector2d>> ghost_ball_position_table;
 
 /**
  * A table of shot infos including obstruction information and difficulty.
  */
-shot_info shot_info_table[WIDTH][LENGTH][EIGHT_BALL_INDEX + 1][NUM_POCKETS];
+vector<vector<vector<vector<shot_info>>>> shot_info_table;
 
 /**
  * A table of possible paths given a cue ball, object ball, pocket, strength, and spin.
  */
-shot_path shot_path_table[WIDTH][LENGTH][EIGHT_BALL_INDEX + 1][NUM_POCKETS][NUM_STRENGTHS][NUM_SPINS];
+vector<vector<vector<vector<vector<vector<shot_path>>>>>> shot_path_table;
 
 /**
  * Initialize the pockets as a vector of Vector2ds.
@@ -268,7 +272,7 @@ obstructions get_obstructions_on_segment_for_shot(unsigned char object_ball_inde
       return obstructions;
     }
   }
-  if (object_ball_index != EIGHT_BALL_INDEX && ball_intersects_segment(eight_ball, segment_start, segment_end))
+  if (object_ball_index != object_balls.size() && ball_intersects_segment(eight_ball, segment_start, segment_end))
   {
     obstructions.has_permanent_obstruction = true;
     return obstructions;
@@ -293,6 +297,14 @@ obstructions get_obstructions_on_segment_for_shot(unsigned char object_ball_inde
  */
 void populate_ball_to_pocket_obstructions_table()
 {
+  for (unsigned char i = 0; i < object_balls.size() + 1; ++i) {
+    vector<obstructions> temp;
+    for (unsigned char j = 0; j < pockets.size(); ++j) {
+      obstructions pocket_obstructions;
+      temp.push_back(pocket_obstructions);
+    }
+    ball_to_pocket_obstructions_table.push_back(temp);
+  }
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     Vector2d pocket = pockets[p];
@@ -300,7 +312,7 @@ void populate_ball_to_pocket_obstructions_table()
     {
       ball_to_pocket_obstructions_table[o][p] = get_obstructions_on_segment_for_shot(o, object_balls[o], pocket);
     }
-    ball_to_pocket_obstructions_table[EIGHT_BALL_INDEX][p] = get_obstructions_on_segment_for_shot(EIGHT_BALL_INDEX, eight_ball, pocket);
+    ball_to_pocket_obstructions_table[object_balls.size()][p] = get_obstructions_on_segment_for_shot(object_balls.size(), eight_ball, pocket);
   }
 }
 
@@ -315,13 +327,21 @@ Vector2d get_ghost_ball_for_shot(const Vector2d& ball, const Vector2d& pocket)
  */
 void populate_ghost_ball_position_table()
 {
+  for (unsigned char i = 0; i < object_balls.size() + 1; ++i) {
+    vector<Vector2d> temp;
+    for (unsigned char j = 0; j < pockets.size(); ++j) {
+
+      temp.push_back(Vector2d(0, 0));
+    }
+    ghost_ball_position_table.push_back(temp);
+  }
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     for (unsigned char o = 0; o < object_balls.size(); ++o)
     {
       ghost_ball_position_table[o][p] = get_ghost_ball_for_shot(object_balls[o], pockets[p]);
     }
-    ghost_ball_position_table[EIGHT_BALL_INDEX][p] = get_ghost_ball_for_shot(eight_ball, pockets[p]);
+    ghost_ball_position_table[object_balls.size()][p] = get_ghost_ball_for_shot(eight_ball, pockets[p]);
   }
 }
 
@@ -379,112 +399,34 @@ segment_intersection_struct get_intersection_of_line_segments(
 }
 
 /**
- * Populates the shot info table obstructions.
- * Relies on initialize_pockets and populate_ball_to_pocket_obstructions_table.
- * TODO: Add unit test.
+ * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
  */
-void populate_shot_info_table_obstructions()
+shot_angle_struct get_shot_angle(const Vector2d& cue_ball, const Vector2d& ghost_ball, const Vector2d& pocket)
 {
-  for (unsigned char o = 0; o < EIGHT_BALL_INDEX + 1; ++o)
-  {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
-    {
-      obstructions ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
-      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w < WIDTH; ++w)
-      {
-        for (unsigned char l = 0; l < LENGTH; ++l)
-        {
-          shot_info &shot_info = shot_info_table[w][l][o][p];
-          shot_info.shot_obstructions = ball_to_pocket_obstructions;
-          if (ball_to_pocket_obstructions.has_permanent_obstruction)
-          {
-            continue;
-          }
-          Vector2d cue_ball = Vector2d(w, l);
-          obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position);
-          if (cue_to_object_obstructions.has_permanent_obstruction)
-          {
-            shot_info.shot_obstructions.has_permanent_obstruction = true;
-            shot_info.shot_obstructions.obstructing_object_balls.clear();
-            continue;
-          }
-          insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Gets the shot difficulty given a cue ball, ghost ball location, and a pocket. It does this by
- * projecting the cue ball onto the ghost ball and pocket line. It then multiplies the projected
- * distance by the distance of the ghost ball to the pocket. Represents the shot difficulty
- * stated here: http://www.sfbilliards.com/articles/1994.pdf
- * If impossible, it returns inf.
- * TODO: Add unit test.
- */
-float get_shot_difficulty(const Vector2d& cue_ball, const Vector2d& ghost_ball, Vector2d pocket)
-{
-  Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
-  Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
-  float projected_distance_of_cue_ball_to_shot_line = ghost_ball_to_cue_ball.squaredNorm() * ghost_ball_to_pocket.norm() / ghost_ball_to_pocket.dot(ghost_ball_to_cue_ball);
-  if (projected_distance_of_cue_ball_to_shot_line > 0)
-  {
-    return std::numeric_limits<float>::infinity();
-  }
-  return -1 * projected_distance_of_cue_ball_to_shot_line * ghost_ball_to_pocket.norm();
-}
-
-/**
- *
- * TODO: Add unit test.
- */
-void populate_shot_info_table_difficulty()
-{
-  for (unsigned char o = 0; o < EIGHT_BALL_INDEX + 1; ++o)
-  {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
-    {
-      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w < WIDTH; ++w)
-      {
-        for (unsigned char l = 0; l < LENGTH; ++l)
-        {
-          shot_info &shot_info = shot_info_table[w][l][o][p];
-          shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position, pockets[p]);
-        }
-      }
-    }
-  }
-}
-
-/**
- * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket.
- * TODO: Add unit test.
- */
-tangent_line get_tangent_line(const Vector2d& cue_ball, const Vector2d& ghost_ball, const Vector2d& pocket)
-{
-  tangent_line tangent;
-  tangent.origin = ghost_ball;
+  shot_angle_struct shot_angle;
+  shot_angle.origin = ghost_ball;
   Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
   Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
-  tangent.pocket_direction = ghost_ball_to_pocket.normalized();
+  shot_angle.pocket_direction = ghost_ball_to_pocket.normalized();
   float determinant = ghost_ball_to_cue_ball.x() * ghost_ball_to_pocket.y() - ghost_ball_to_cue_ball.y() * ghost_ball_to_pocket.x();
   Vector2d tangent_line_direction = ghost_ball_to_pocket.unitOrthogonal();
   if (determinant < 0)
   {
-    tangent.follow_direction = tangent_line::COUNTER_CLOCKWISE;
-    tangent.tangent_line_direction = Vector2d(-1 * tangent_line_direction.x(), -1 * tangent_line_direction.y());
+    shot_angle.follow_direction = shot_angle_struct::COUNTER_CLOCKWISE;
+    shot_angle.tangent_line_direction = Vector2d(-1 * tangent_line_direction.x(), -1 * tangent_line_direction.y());
   } else {
-    tangent.follow_direction = tangent_line::CLOCKWISE;
-    tangent.tangent_line_direction = tangent_line_direction;
+    shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
+    shot_angle.tangent_line_direction = tangent_line_direction;
   }
-  return tangent;
+  double dot = ghost_ball_to_cue_ball.dot(ghost_ball_to_pocket);
+  float negative_cos_theta = dot / (ghost_ball_to_cue_ball.norm() * ghost_ball_to_pocket.norm());
+  shot_angle.fractional_distance = 1 - negative_cos_theta * negative_cos_theta;
+  return shot_angle;
 }
 
 /**
  * Gets the path of a ball after it bounces off table edges.
+ * Depends on pocket and table edges being initialized.
  * segment_length is passed in for optimization purposes. It can also be calculated using segment_start
  * and segment_end.
  */
@@ -536,43 +478,186 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
 
   float start_to_rail_length = (rail_reflection.intersection_point - segment_start).norm();
   float rail_to_end_length = segment_length - start_to_rail_length;
-  rail_reflection.end_point = segment_end + rail_to_end_length * direction_of_final_vector;
+  rail_reflection.end_point = rail_reflection.intersection_point + rail_to_end_length * direction_of_final_vector;
+  rail_reflection.distance_traveled_after_rail = rail_to_end_length;
   return rail_reflection;
 }
 
 /**
- * Gets the path given the tangent line, a strength, and a spin.
- * TODO: This is just a hack right now.
- * TODO: Add unit test.
+ * Converts the strength given to the distance traveled by the cue ball if it does not
+ * contact an object ball.
  */
-vector<Vector2d> get_path(tangent_line tangent, unsigned char strength, unsigned char spin)
+float strength_to_distance(unsigned char strength) {
+  return 1.0 * strength * MAX_DIAMONDS / NUM_STRENGTHS * DIAMOND_LENGTH;
+}
+
+/**
+ * Gets the path given the shot angle info, a strength, and a spin.
+ * Relies on pockets and table edges being populated.
+ * TODO: This is just a hack right now. Does not take spin into account.
+ */
+vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, unsigned char spin)
 {
   vector<Vector2d> ret;
-  Vector2d initial_end_point = (tangent.tangent_line_direction * strength * DIAMOND_LENGTH / 2) + tangent.origin;
-
-  ret.push_back(tangent.origin);
-  ret.push_back(tangent.origin);
-  ret.push_back(tangent.origin);
-  ret.push_back(initial_end_point);
+  float distance_to_travel = shot_angle.fractional_distance * strength_to_distance(strength);
+  Vector2d cue_ball_destination = shot_angle.tangent_line_direction * distance_to_travel + shot_angle.origin;
+  Vector2d cue_ball_location = shot_angle.origin;
+  ret.push_back(cue_ball_location);
+  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
+    cue_ball_location, cue_ball_destination, distance_to_travel);
+  while(rail_reflection.has_intersection) {
+    ret.push_back(rail_reflection.intersection_point);
+    cue_ball_location = rail_reflection.intersection_point;
+    cue_ball_destination = rail_reflection.end_point;
+    distance_to_travel = rail_reflection.distance_traveled_after_rail;
+    rail_reflection = reflect_ball_path_off_table_edges(
+      cue_ball_location, cue_ball_destination, distance_to_travel);
+  }
+  ret.push_back(cue_ball_destination);
   return ret;
+}
+
+/**
+ * Populates the shot info table obstructions.
+ * Relies on initialize_pockets and populate_ball_to_pocket_obstructions_table, populate_ghost_ball_table.
+ * TODO: Add unit tests for this function onwards.
+ */
+void populate_shot_info_table_obstructions()
+{
+  for (unsigned char w = 0; w <= WIDTH; ++w) {
+    vector<vector<vector<shot_info>>> temp1;
+    for (unsigned char l = 0; l <= LENGTH; ++l) {
+      vector<vector<shot_info>> temp2;
+      for (unsigned char o = 0; o < object_balls.size() + 1; ++o) {
+          vector<shot_info> temp3;
+          for (unsigned char p = 0; p < pockets.size(); ++p)
+          {
+            shot_info temp_shot_info;
+            temp3.push_back(temp_shot_info);
+          }
+          temp2.push_back(temp3);
+        }
+        temp1.push_back(temp2);
+    }
+    shot_info_table.push_back(temp1);
+  }
+  for (unsigned char o = 0; o < object_balls.size() + 1; ++o) {
+    for (unsigned char p = 0; p < pockets.size(); ++p) {
+      obstructions ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
+      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
+      for (unsigned char w = 0; w <= WIDTH; ++w)
+      {
+        for (unsigned char l = 0; l <= LENGTH; ++l)
+        {
+          shot_info &shot_info = shot_info_table[w][l][o][p];
+          shot_info.shot_obstructions = ball_to_pocket_obstructions;
+          if (ball_to_pocket_obstructions.has_permanent_obstruction)
+          {
+            continue;
+          }
+          Vector2d cue_ball = Vector2d(w, l);
+          obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position);
+          if (cue_to_object_obstructions.has_permanent_obstruction)
+          {
+            shot_info.shot_obstructions.has_permanent_obstruction = true;
+            shot_info.shot_obstructions.obstructing_object_balls.clear();
+            continue;
+          }
+          insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Gets the shot difficulty given a cue ball, ghost ball location, and a pocket. It does this by
+ * projecting the cue ball onto the ghost ball and pocket line. It then multiplies the projected
+ * distance by the distance of the ghost ball to the pocket. Represents the shot difficulty
+ * stated here: http://www.sfbilliards.com/articles/1994.pdf
+ * If impossible, it returns inf.
+ * TODO: Add unit test.
+ */
+float get_shot_difficulty(const Vector2d& cue_ball, const Vector2d& ghost_ball, Vector2d pocket)
+{
+  Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
+  Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
+  float projected_distance_of_cue_ball_to_shot_line = ghost_ball_to_cue_ball.squaredNorm() * ghost_ball_to_pocket.norm() / ghost_ball_to_pocket.dot(ghost_ball_to_cue_ball);
+  if (projected_distance_of_cue_ball_to_shot_line > 0)
+  {
+    return std::numeric_limits<float>::infinity();
+  }
+  return -1 * projected_distance_of_cue_ball_to_shot_line * ghost_ball_to_pocket.norm();
 }
 
 /**
  *
  * TODO: Add unit test.
  */
-void populate_shot_path_table()
+void populate_shot_info_table_difficulty()
 {
-  for (unsigned char o = 0; o < EIGHT_BALL_INDEX + 1; ++o)
+  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)
     {
       Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w < WIDTH; ++w)
+      for (unsigned char w = 0; w <= WIDTH; ++w)
       {
-        for (unsigned char l = 0; l < LENGTH; ++l)
+        for (unsigned char l = 0; l <= LENGTH; ++l)
         {
-          tangent_line tangent = get_tangent_line(Vector2d(w, l), ghost_ball_position, pockets[p]);
+          shot_info &shot_info = shot_info_table[w][l][o][p];
+          shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position, pockets[p]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ *
+ * TODO: Add unit test.
+ * TODO: Possible optimization is to populate a map of map[object balls][pockets][angles][num strength][num spins] and use that to
+ * populate the full table of map[object balls][pockets][cue ball positions][num strengths][num spins]
+ */
+void populate_shot_path_table()
+{
+  for (unsigned char w = 0; w <= WIDTH; ++w)
+  {
+    vector<vector<vector<vector<vector<shot_path>>>>> temp1;
+    for (unsigned char l = 0; l <= LENGTH; ++l) {
+      vector<vector<vector<vector<shot_path>>>> temp2;
+      for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+        {
+          vector<vector<vector<shot_path>>> temp3;
+          for (unsigned char p = 0; p < pockets.size(); ++p)
+          {
+            vector<vector<shot_path>> temp4;
+            for (unsigned char st = 0; st < NUM_STRENGTHS; ++st) {
+              vector<shot_path> temp5;
+              for (unsigned char sp = 0; sp < NUM_SPINS; ++sp) {
+                shot_path current_shot_path;
+                temp5.push_back(current_shot_path);
+              }
+              temp4.push_back(temp5);
+            }
+            temp3.push_back(temp4);
+          }
+          temp2.push_back(temp3);
+        }
+        temp1.push_back(temp2);
+    }
+    shot_path_table.push_back(temp1);
+  }
+  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+  {
+    for (unsigned char p = 0; p < pockets.size(); ++p)
+    {
+      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
+      for (unsigned char w = 0; w <= WIDTH; ++w)
+      {
+        for (unsigned char l = 0; l <= LENGTH; ++l)
+        {
+          shot_angle_struct shot_angle = get_shot_angle(Vector2d(w, l), ghost_ball_position, pockets[p]);
           for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
           {
             for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
@@ -582,7 +667,7 @@ void populate_shot_path_table()
               {
                 continue;
               }
-              vector<Vector2d> path = get_path(tangent, st, sp);
+              vector<Vector2d> path = get_path(shot_angle, st, sp);
               current_shot_path.path_segments = path;
               current_shot_path.final_position = path[path.size() - 1];
               for (unsigned char pa = 0; pa < path.size() - 1; ++pa) {
@@ -601,17 +686,9 @@ void populate_shot_path_table()
   }
 }
 
-/**
- *
- * TODO: Add unit test.
- */
-void populate_shot_info_table()
-{
-  populate_shot_info_table_obstructions();
-  populate_shot_info_table_difficulty();
-  populate_shot_path_table();
-}
+void get_runout() {
 
+}
 /*
 std::ostream &operator<<(std::ostream &o, const obstructions &obstructions)
 {

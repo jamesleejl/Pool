@@ -26,7 +26,9 @@ int main()
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
-  populate_shot_info_table();
+  populate_shot_info_table_obstructions();
+  populate_shot_info_table_difficulty();
+  populate_shot_path_table();
 
   auto end = std::chrono::system_clock::now();
 
