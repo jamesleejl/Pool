@@ -297,14 +297,7 @@ obstructions get_obstructions_on_segment_for_shot(unsigned char object_ball_inde
  */
 void populate_ball_to_pocket_obstructions_table()
 {
-  for (unsigned char i = 0; i < object_balls.size() + 1; ++i) {
-    vector<obstructions> temp;
-    for (unsigned char j = 0; j < pockets.size(); ++j) {
-      obstructions pocket_obstructions;
-      temp.push_back(pocket_obstructions);
-    }
-    ball_to_pocket_obstructions_table.push_back(temp);
-  }
+  ball_to_pocket_obstructions_table = vector<vector<obstructions>> (object_balls.size() + 1, vector<obstructions>(pockets.size()));
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     Vector2d pocket = pockets[p];
@@ -327,14 +320,7 @@ Vector2d get_ghost_ball_for_shot(const Vector2d& ball, const Vector2d& pocket)
  */
 void populate_ghost_ball_position_table()
 {
-  for (unsigned char i = 0; i < object_balls.size() + 1; ++i) {
-    vector<Vector2d> temp;
-    for (unsigned char j = 0; j < pockets.size(); ++j) {
-
-      temp.push_back(Vector2d(0, 0));
-    }
-    ghost_ball_position_table.push_back(temp);
-  }
+  ghost_ball_position_table = vector<vector<Vector2d>> (object_balls.size() + 1, vector<Vector2d>(pockets.size()));
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     for (unsigned char o = 0; o < object_balls.size(); ++o)
@@ -524,6 +510,7 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
  */
 void populate_shot_info_table_obstructions()
 {
+  shot_info_table = vector<vector<vector<vector<shot_info>>>> (WIDTH + 1, vector<vector<vector<shot_info>>> (LENGTH + 1, vector<vector<shot_info>> (object_balls.size() + 1, vector<shot_info> (pockets.size()))));
   for (unsigned char w = 0; w <= WIDTH; ++w) {
     vector<vector<vector<shot_info>>> temp1;
     for (unsigned char l = 0; l <= LENGTH; ++l) {
@@ -621,33 +608,7 @@ void populate_shot_info_table_difficulty()
  */
 void populate_shot_path_table()
 {
-  for (unsigned char w = 0; w <= WIDTH; ++w)
-  {
-    vector<vector<vector<vector<vector<shot_path>>>>> temp1;
-    for (unsigned char l = 0; l <= LENGTH; ++l) {
-      vector<vector<vector<vector<shot_path>>>> temp2;
-      for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
-        {
-          vector<vector<vector<shot_path>>> temp3;
-          for (unsigned char p = 0; p < pockets.size(); ++p)
-          {
-            vector<vector<shot_path>> temp4;
-            for (unsigned char st = 0; st < NUM_STRENGTHS; ++st) {
-              vector<shot_path> temp5;
-              for (unsigned char sp = 0; sp < NUM_SPINS; ++sp) {
-                shot_path current_shot_path;
-                temp5.push_back(current_shot_path);
-              }
-              temp4.push_back(temp5);
-            }
-            temp3.push_back(temp4);
-          }
-          temp2.push_back(temp3);
-        }
-        temp1.push_back(temp2);
-    }
-    shot_path_table.push_back(temp1);
-  }
+  shot_path_table = vector<vector<vector<vector<vector<vector<shot_path>>>>>> (WIDTH + 1, vector<vector<vector<vector<vector<shot_path>>>>> (LENGTH + 1, vector<vector<vector<vector<shot_path>>>> (object_balls.size() + 1, vector<vector<vector<shot_path>>> (pockets.size(), vector<vector<shot_path>> (NUM_STRENGTHS, vector<shot_path> (NUM_SPINS))))));
   for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)

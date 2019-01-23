@@ -28,7 +28,6 @@ class PoolTest : public ::testing::Test {
     opponent_object_balls.clear();
     eight_ball = Vector2d(0, 0);
     cue_ball = Vector2d(0, 0);
-    obstructions empty_obstructions;
     ball_to_pocket_obstructions_table.clear();
     ghost_ball_position_table.clear();
     shot_info_table.clear();
