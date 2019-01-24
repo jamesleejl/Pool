@@ -168,16 +168,17 @@ TEST_F(PoolTest, GetObstructionsOnSegmentForShot_object_ball_obstruction) {
 }
 
 TEST_F(PoolTest, PopulateBallToPocketObstructionsTable) {
-  initialize_pockets();
   eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 6);
   object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
   object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.5, DIAMOND_LENGTH * 7));
   object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4));
   opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4));
   opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 2));
+  initialize_pockets();
+  initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   for (unsigned char p = 0; p < 6; ++p) {
-    for (unsigned char b = 0; b < 3; ++b) {
+    for (unsigned char b = 0; b < object_balls.size(); ++b) {
       if ((b == 0 && p == 1) || (b == 0 && p == 3) || (b == 0 && p == 4) ||
           (b == 1 && p == 1) || (b == 2 && p == 3)) {
         EXPECT_TRUE(ball_to_pocket_obstructions_table[b][p].has_permanent_obstruction);
@@ -196,12 +197,6 @@ TEST_F(PoolTest, PopulateBallToPocketObstructionsTable) {
     } else {
       EXPECT_FALSE(ball_to_pocket_obstructions_table[object_balls.size()][p].has_permanent_obstruction);
     }
-    if (p == 4) {
-      EXPECT_EQ(1, ball_to_pocket_obstructions_table[object_balls.size()][p].obstructing_object_balls.size());
-      EXPECT_TRUE(ball_to_pocket_obstructions_table[object_balls.size()][p].obstructing_object_balls.find(1) != ball_to_pocket_obstructions_table[object_balls.size()][p].obstructing_object_balls.end());
-    } else {
-      EXPECT_EQ(0, ball_to_pocket_obstructions_table[object_balls.size()][p].obstructing_object_balls.size());
-    }
   }
 }
 
@@ -216,10 +211,12 @@ TEST_F(PoolTest, GetGhostBallForShot) {
 }
 
 TEST_F(PoolTest, PopulateGhostBallPositionTable) {
-  initialize_pockets();
   eight_ball = Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4);
   object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
   object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
+  initialize_pockets();
+  initialize_table_edges();
+  populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
   for (unsigned char i = 0; i < 8; ++i) {
     if (i >= 2 && i <= 7) {
@@ -449,26 +446,120 @@ TEST_F(PoolTest, GetPath_intersectsRailAt45Degrees) {
   expect_vector2d_equal(Vector2d(1.5735935, 12.426409), path[8]);
 }
 
-// TODO: Not a real test, but the data looks okay.
 TEST_F(PoolTest, PopulateShotInfoTableObstructions) {
-  initialize_pockets();
   eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 6);
   object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
+  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 2));
   opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4));
+  initialize_pockets();
+  initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
   populate_shot_info_table_obstructions();
   for (unsigned char w = 0; w <= WIDTH; ++w) {
     for (unsigned char l = 0; l <= LENGTH; ++l) {
-      for (unsigned char p = 0; p < 6; ++p) {
-        for (unsigned char b = object_balls.size(); b < object_balls.size() + 1; ++b) {
-          if (shot_info_table[w][l][b][p].shot_obstructions.obstructing_object_balls.size() > 0) {
-            cout << (int) w << " " << (int) l << " " << (int) b << " " << (int) p << " " << shot_info_table[w][l][b][p].shot_obstructions.obstructing_object_balls.size() << endl;
+      for (unsigned char b = 0; b < object_balls.size() + 1; ++b) {
+        for (unsigned char p = 0; p < 6; ++p) {
+          if (b == 0 && (p == 3 || p == 4)) {
+            EXPECT_TRUE(shot_info_table[w][l][b][p].shot_obstructions.has_permanent_obstruction);
           }
         }
       }
     }
   }
+}
+
+TEST_F(PoolTest, GetShotDifficulty_projectAngledShot) {
+  EXPECT_EQ(16,
+    get_shot_difficulty(
+      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+}
+
+TEST_F(PoolTest, GetShotDifficulty) {
+  EXPECT_EQ(8,
+    get_shot_difficulty(
+      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+}
+
+TEST_F(PoolTest, GetShotDifficulty_impossible) {
+  EXPECT_EQ(std::numeric_limits<float>::infinity(),
+    get_shot_difficulty(
+      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+}
+
+TEST_F(PoolTest, GetShotDifficulty_onGhostBall) {
+  EXPECT_EQ(0,
+    get_shot_difficulty(
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+}
+
+TEST_F(PoolTest, GetShotDifficulty_impossibleNinetyDegrees) {
+  EXPECT_EQ(std::numeric_limits<float>::infinity(),
+    get_shot_difficulty(
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 3),
+      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
+      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+}
+
+TEST_F(PoolTest, PopulateShotInfoTableDifficulty) {
+  eight_ball = Vector2d(DIAMOND_LENGTH * 2 + BALL_DIAMETER, DIAMOND_LENGTH * 4);
+  initialize_pockets();
+  initialize_table_edges();
+  populate_ball_to_pocket_obstructions_table();
+  populate_ghost_ball_position_table();
+  populate_shot_info_table_obstructions();
+  populate_shot_info_table_difficulty();
+  EXPECT_EQ(16, shot_info_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][3].difficulty);
+  EXPECT_EQ(
+    std::numeric_limits<float>::infinity(),
+    shot_info_table[DIAMOND_LENGTH * 2.5][DIAMOND_LENGTH * 3][0][3].difficulty);
+  EXPECT_EQ(8, shot_info_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 4][0][3].difficulty);
+}
+
+TEST_F(PoolTest, PopulateShotPathTable) {
+  eight_ball = Vector2d(DIAMOND_LENGTH * 2 + BALL_DIAMETER, DIAMOND_LENGTH * 4);
+  opponent_object_balls.push_back(Vector2d(4 * DIAMOND_LENGTH, 3 * DIAMOND_LENGTH));
+  initialize_pockets();
+  initialize_table_edges();
+  populate_ball_to_pocket_obstructions_table();
+  populate_ghost_ball_position_table();
+  populate_shot_info_table_obstructions();
+  populate_shot_info_table_difficulty();
+  populate_shot_path_table();
+
+  shot_path& current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][0][10][2];
+  EXPECT_FALSE(current_shot_path.possible);
+  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][1][10][2];
+  EXPECT_FALSE(current_shot_path.possible);
+  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][2][10][2];
+  EXPECT_FALSE(current_shot_path.possible);
+  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][4][10][2];
+  EXPECT_FALSE(current_shot_path.possible);
+  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][3][10][2];
+  EXPECT_EQ(4, current_shot_path.path_segments.size());
+  expect_vector2d_equal(Vector2d(4, 8), current_shot_path.path_segments[0]);
+  expect_vector2d_equal(Vector2d(4, 16), current_shot_path.path_segments[1]);
+  expect_vector2d_equal(Vector2d(4, 0), current_shot_path.path_segments[2]);
+  expect_vector2d_equal(Vector2d(4, 0.99999619), current_shot_path.path_segments[3]);
+  expect_vector2d_equal(Vector2d(4, 0.99999619), current_shot_path.final_position);
+  EXPECT_FALSE(current_shot_path.shot_obstructions.has_permanent_obstruction);
+  EXPECT_TRUE(current_shot_path.possible);
+  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][5][10][2];
+  EXPECT_EQ(3, current_shot_path.path_segments.size());
+  expect_vector2d_equal(Vector2d(4.2109075, 7.6723242), current_shot_path.path_segments[0]);
+  expect_vector2d_equal(Vector2d(8, 5.9482875), current_shot_path.path_segments[1]);
+  expect_vector2d_equal(Vector2d(1.4733558, 2.9786642), current_shot_path.path_segments[2]);
+  expect_vector2d_equal(Vector2d(1.4733558, 2.9786642), current_shot_path.final_position);
+  EXPECT_TRUE(current_shot_path.shot_obstructions.has_permanent_obstruction);
+  EXPECT_TRUE(current_shot_path.possible);
 }
 
 }  // namespace
