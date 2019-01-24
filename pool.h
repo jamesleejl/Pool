@@ -9,6 +9,7 @@ using namespace Eigen;
 using namespace std;
 
 // TODO: Handle bank shots.
+// TODO: Handle side pocket shots correctly. https://billiards.colostate.edu/threads/pocket.html
 // TODO: Handle minimum distance cue ball must travel to sink an object ball for scratch purposes and other reasons.
 
 /**
@@ -418,6 +419,12 @@ void insert_into_set(set<unsigned char> &set1, set<unsigned char> &set2)
   }
 }
 
+// TODO: Test.
+bool double_equals(double a, double b, double epsilon = 0.0001)
+{
+  return std::abs(a - b) < epsilon;
+}
+
 /**
  * Gets the intersection of two line segments.
  * Uses the method outlined here: https://www.topcoder.com/community/competitive-programming/tutorials/geometry-concepts-line-intersection-and-its-applications/
@@ -439,23 +446,24 @@ segment_intersection_struct get_intersection_of_line_segments(
   segment_intersection.has_intersection = false;
   if (det == 0)
   {
+    cout << "HERE1" << endl;
     return segment_intersection;
   }
   double x = (B2 * C1 - B1 * C2) / det;
   double y = (A1 * C2 - A2 * C1) / det;
-  if (x < segment1_ranges.min_x || x > segment1_ranges.max_x)
+  if (!double_equals(x, segment1_ranges.min_x) && !double_equals(x, segment1_ranges.max_x) && (x < segment1_ranges.min_x || x > segment1_ranges.max_x))
   {
     return segment_intersection;
   }
-  else if (y < segment1_ranges.min_y || y > segment1_ranges.max_y)
+  else if (!double_equals(y, segment1_ranges.min_y) && !double_equals(y, segment1_ranges.max_y) && (y < segment1_ranges.min_y || y > segment1_ranges.max_y))
   {
     return segment_intersection;
   }
-  else if (x < segment2_ranges.min_x || x > segment2_ranges.max_x)
+  else if (!double_equals(x, segment2_ranges.min_x) && !double_equals(x, segment2_ranges.max_x) && (x < segment2_ranges.min_x || x > segment2_ranges.max_x))
   {
     return segment_intersection;
   }
-  else if (y < segment2_ranges.min_y || y > segment2_ranges.max_y)
+  else if (!double_equals(x, segment1_ranges.min_y) && !double_equals(x, segment1_ranges.max_y) && (y < segment2_ranges.min_y || y > segment2_ranges.max_y))
   {
     return segment_intersection;
   }
@@ -747,11 +755,10 @@ void populate_eight_ball_in_selected_shot_table()
   {
     for (unsigned char l = 0; l <= LENGTH; ++l)
     {
-      selected_shot_struct &selected_shot = selected_shot_table[WIDTH][LENGTH][0];
+      selected_shot_struct &selected_shot = selected_shot_table[w][l][0];
       for (unsigned char p = 0; p < pockets.size(); ++p)
       {
-        shot_info &current_shot_info = shot_info_table[WIDTH][LENGTH][object_balls.size()][p];
-        cout << (int)w << " " << (int)l << " " << (int)p << " " << current_shot_info.difficulty << endl;
+        shot_info &current_shot_info = shot_info_table[w][l][object_balls.size()][p];
         if (!current_shot_info.shot_obstructions.has_permanent_obstruction && current_shot_info.difficulty <= MAX_DIFFICULTY_SHOT_TO_CONSIDER &&
             current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
         {
@@ -765,34 +772,53 @@ void populate_eight_ball_in_selected_shot_table()
       }
     }
   }
-  for (unsigned char w = 0; w <= WIDTH; ++w)
-  {
-    for (unsigned char l = 0; l <= LENGTH; ++l)
-    {
-      cout << (int)w << " " << (int)l << " " << selected_shot_table[w][l][0].total_weighted_difficulty << endl;
-    }
-  }
 }
 
+// TODO: Doesn't work.
 void populate_single_combination_in_selected_shot_table(int combo, set<unsigned char> &balls)
 {
-  int count = 0;
-  cout << combo << endl;
-  cout << balls.size() << endl;
   for (auto ball : balls)
   {
-    count += ball;
     for (unsigned char w = 0; w <= WIDTH; ++w)
     {
       for (unsigned char l = 0; l <= LENGTH; ++l)
       {
-        selected_shot_struct selected_shot;
+        selected_shot_struct &selected_shot = selected_shot_table[w][l][ball];
         for (unsigned char p = 0; p < pockets.size(); ++p)
         {
-          for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
+          shot_info &current_shot_info = shot_info_table[w][l][ball][p];
+          if (!current_shot_info.shot_obstructions.has_permanent_obstruction && current_shot_info.difficulty <= MAX_DIFFICULTY_SHOT_TO_CONSIDER &&
+              current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
           {
-            for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
+            for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
             {
+              for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
+              {
+                shot_path &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
+                if (!current_shot_path.not_too_difficult || current_shot_path.shot_obstructions.has_permanent_obstruction)
+                {
+                  continue;
+                }
+                set<unsigned char> intersect;
+                set_intersection(balls.begin(), balls.end(), current_shot_path.shot_obstructions.obstructing_object_balls.begin(), current_shot_path.shot_obstructions.obstructing_object_balls.end(),
+                                 std::inserter(intersect, intersect.begin()));
+                if (intersect.size() > 0)
+                {
+                  continue;
+                }
+                unsigned char rounded_x = (unsigned char)(0.5 + current_shot_path.final_position.x());
+                unsigned char rounded_y = (unsigned char)(0.5 + current_shot_path.final_position.y());
+                float new_weighted_difficulty = current_shot_info.weighted_difficulty + selected_shot_table[rounded_x][rounded_y][combo - (1 << ball)].total_weighted_difficulty;
+                if (new_weighted_difficulty < selected_shot.total_weighted_difficulty)
+                {
+                  selected_shot.total_weighted_difficulty = current_shot_info.weighted_difficulty;
+                  selected_shot.pocket = p;
+                  selected_shot.object_ball = ball;
+                  selected_shot.strength = st;
+                  selected_shot.spin = sp;
+                  selected_shot.path_segments = current_shot_path.path_segments;
+                }
+              }
             }
           }
         }
@@ -800,6 +826,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
     }
   }
 }
+
 // Process a given combination of object balls.
 // combo represents the indices of object balls to consider. It is represented as a number
 void process_object_ball_combination(int num_object_balls, int combo)
@@ -841,6 +868,10 @@ void populate_selected_shot_table()
   {
     process_object_ball_combinations(object_balls.size(), i);
   }
+  selected_shot_struct selected_shot = selected_shot_table[8][3][7];
+  cout << selected_shot.object_ball << endl;
+  cout << selected_shot.pocket << endl;
+  cout << selected_shot.total_weighted_difficulty << endl;
 }
 
 /*
