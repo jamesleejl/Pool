@@ -23,6 +23,7 @@ struct obstructions_struct
   bool has_permanent_obstruction = true;
   /**
    * Obstructing object balls belonging to the player are listed here.
+   * Only populated if has_permanent_obstruction is false.
    */
   set<unsigned char> obstructing_object_balls;
 };
@@ -325,8 +326,8 @@ void initialize_table_edges()
 }
 
 /**
- * The distance from the point to the segment. Returns -1 if the perpendicular line through point
- * does not intersect with segment.
+ * The distance from the point to the segment. Returns infinity if the perpendicular distance from the point to
+ * the line defined by the segment lies off the segment. (To either side of it.)
  */
 float distance_from_point_to_segment(const Vector2d &p, const Vector2d &segment_start, const Vector2d &segment_end)
 {
@@ -335,16 +336,16 @@ float distance_from_point_to_segment(const Vector2d &p, const Vector2d &segment_
   const float dot = start_to_point.dot(start_to_end);
   if (dot < 0)
   {
-    return -1;
+    return std::numeric_limits<float>::infinity();
   }
-  const float segment_length_squared = start_to_end.squaredNorm();
+  const float start_to_end_length_squared = start_to_end.squaredNorm();
+  if (dot > start_to_end_length_squared)
+  {
+    return std::numeric_limits<float>::infinity();
+  }
   // t is the ratio of the distance of (start, projected point) to
   // (start, end).
-  if (dot > segment_length_squared)
-  {
-    return -1;
-  }
-  const float t = dot / segment_length_squared;
+  const float t = dot / start_to_end_length_squared;
   const Vector2d projected_point = segment_start + t * start_to_end;
   return (p - projected_point).norm();
 }
@@ -379,7 +380,7 @@ segment_range_struct get_segment_ranges(const Vector2d &segment_start, const Vec
 }
 
 /**
- * Returns where a ball intersects the given line segment.
+ * Returns whether a ball intersects the given line segment.
  */
 bool ball_intersects_segment(const Vector2d &ball, const Vector2d &segment_start, const Vector2d &segment_end)
 {
@@ -414,50 +415,66 @@ bool ball_intersects_segment(const Vector2d &ball, const Vector2d &segment_start
 }
 
 /**
+ * Gets the index of the eight ball.
+ */
+unsigned char eight_ball_index() {
+  return object_balls.size();
+}
+
+/**
  * Gets the obstructing balls lying on the given line segment for a given shot. We use this function to
  * check that no balls are obstructing the path of the cue ball to the object ball and from the object
  * ball to a particular pocket. If a permanent obstruction is found, return obstructions immediately.
- * object_ball_index the index of the object ball we are shooting at. It is ignored in our list of obstructions.
- * Has a param for whether or not to include pockets.
+ * This function relies on {@code opponent_object_balls}, {@code object_balls}, {@code eight_ball}, and {@code pockets} 
+ * being populated.
+ *
+ * @param object_ball_index the index of the object ball we are shooting at. It is not populated into the list of 
+ * obstructions since it cannot obstruct itself. The eight ball is represented by an index of eight_ball_index().
+ * @param consider_pockets whether or not to include the pockets on the list of possible obstructions. 
  * TODO: Make pocket handling a bit more precise.
  */
-obstructions_struct get_obstructions_on_segment_for_shot(unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool consider_pockets)
+obstructions_struct get_obstructions_on_segment_for_shot(
+  unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool consider_pockets)
 {
   obstructions_struct obstructions;
-  for (unsigned char i = 0; i < opponent_object_balls.size(); ++i)
+  for (unsigned char o = 0; o < opponent_object_balls.size(); ++o)
   {
-    if (ball_intersects_segment(opponent_object_balls[i], segment_start, segment_end))
+    if (ball_intersects_segment(opponent_object_balls[o], segment_start, segment_end))
     {
+      obstructions.has_permanent_obstruction = true;
       return obstructions;
     }
   }
   if (consider_pockets)
   {
-    for (unsigned char i = 0; i < pockets.size(); ++i)
+    for (unsigned char p = 0; p < pockets.size(); ++p)
     {
-      if (ball_intersects_segment(pockets[i], segment_start, segment_end))
+      if (ball_intersects_segment(pockets[p], segment_start, segment_end))
       {
+        obstructions.has_permanent_obstruction = true;
         return obstructions;
       }
     }
   }
-  if (object_ball_index != object_balls.size() && ball_intersects_segment(eight_ball, segment_start, segment_end))
+  if (object_ball_index == eight_ball_index()) {
+    obstructions.has_permanent_obstruction = false;
+    return obstructions;
+  }
+  if (ball_intersects_segment(eight_ball, segment_start, segment_end))
   {
+    obstructions.has_permanent_obstruction = true;
     return obstructions;
   }
   obstructions.has_permanent_obstruction = false;
-  if (object_ball_index != object_balls.size())
+  for (unsigned char i = 0; i < object_balls.size(); ++i)
   {
-    for (unsigned char i = 0; i < object_balls.size(); ++i)
+    if (i == object_ball_index)
     {
-      if (i == object_ball_index)
-      {
-        continue;
-      }
-      if (ball_intersects_segment(object_balls[i], segment_start, segment_end))
-      {
-        obstructions.obstructing_object_balls.insert(i);
-      }
+      continue;
+    }
+    if (ball_intersects_segment(object_balls[i], segment_start, segment_end))
+    {
+      obstructions.obstructing_object_balls.insert(i);
     }
   }
   return obstructions;
@@ -469,7 +486,7 @@ obstructions_struct get_obstructions_on_segment_for_shot(unsigned char object_ba
  */
 void populate_ball_to_pocket_obstructions_table()
 {
-  ball_to_pocket_obstructions_table = vector<vector<obstructions>>(object_balls.size() + 1, vector<obstructions>(pockets.size()));
+  ball_to_pocket_obstructions_table = vector<vector<obstructions_struct>>(object_balls.size() + 1, vector<obstructions_struct>(pockets.size()));
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     Vector2d pocket = pockets[p];
@@ -477,7 +494,7 @@ void populate_ball_to_pocket_obstructions_table()
     {
       ball_to_pocket_obstructions_table[o][p] = get_obstructions_on_segment_for_shot(o, object_balls[o], pocket, false);
     }
-    ball_to_pocket_obstructions_table[object_balls.size()][p] = get_obstructions_on_segment_for_shot(object_balls.size(), eight_ball, pocket, false);
+    ball_to_pocket_obstructions_table[eight_ball_index()][p] = get_obstructions_on_segment_for_shot(eight_ball_index(), eight_ball, pocket, false);
   }
 }
 
@@ -499,7 +516,7 @@ void populate_ghost_ball_position_table()
     {
       ghost_ball_position_table[o][p] = get_ghost_ball_for_shot(object_balls[o], pockets[p]);
     }
-    ghost_ball_position_table[object_balls.size()][p] = get_ghost_ball_for_shot(eight_ball, pockets[p]);
+    ghost_ball_position_table[eight_ball_index()][p] = get_ghost_ball_for_shot(eight_ball, pockets[p]);
   }
 }
 
@@ -853,14 +870,14 @@ void populate_eight_ball_in_selected_shot_table()
       selected_shot_struct &selected_shot = selected_shot_table[w][l][0];
       for (unsigned char p = 0; p < pockets.size(); ++p)
       {
-        shot_info_struct &current_shot_info = shot_info_table[w][l][object_balls.size()][p];
+        shot_info_struct &current_shot_info = shot_info_table[w][l][eight_ball_index()][p];
         if (!current_shot_info.shot_obstructions.has_permanent_obstruction && current_shot_info.difficulty <= MAX_DIFFICULTY_SHOT_TO_CONSIDER &&
             current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
         {
           selected_shot.possible = true;
           selected_shot.total_weighted_difficulty = current_shot_info.weighted_difficulty;
           selected_shot.pocket = p;
-          selected_shot.object_ball = object_balls.size();
+          selected_shot.object_ball = eight_ball_index();
           selected_shot.strength = 0; // TODO: Handle path better
           selected_shot.spin = 0;     // TODO: Handle path better
         }
