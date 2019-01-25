@@ -1,3 +1,5 @@
+#include <iomanip>
+#include <sstream>
 #include <iostream>
 #include <vector>
 #include <set>
@@ -80,6 +82,21 @@ struct unsigned_char_coordinates_struct
    * The y coordinate.
    */
   unsigned char y;
+};
+
+/**
+ * Holds information about ghost balls.
+ */
+struct ghost_ball_struct
+{
+  /**
+   * Whether there is a valid ghost ball or not.
+   */
+  bool possible = false;
+  /**
+   * The coordinates.
+   */
+  Vector2d coords;
 };
 
 /**
@@ -359,7 +376,7 @@ vector<vector<obstructions_struct>> ball_to_pocket_obstructions_table;
  * object_balls.size().
  * Dimensions are [Object balls Size + 1][Pockets]
  */
-vector<vector<Vector2d>> ghost_ball_position_table;
+vector<vector<ghost_ball_struct>> ghost_ball_position_table;
 
 /**
  * A table of shot infos including obstruction information and difficulty. Includes the 8 ball at index
@@ -386,6 +403,25 @@ vector<vector<vector<vector<vector<vector<shot_path_struct>>>>>> shot_path_table
  * Dimensions are [Width + 1][Length + 1][Num table layouts].
  */
 vector<vector<vector<selected_shot_struct>>> selected_shot_table;
+
+string vector_to_string(Vector2d vec) {
+  stringstream stream;
+  stream << "(";
+  stream << fixed << setprecision(1) << vec.x();
+  stream << ", ";
+  stream << fixed << setprecision(1) << vec.y();
+  stream << ")";
+  return stream.str();
+}
+
+string path_to_string(vector<Vector2d> path) {
+  string ret = "";
+  for (auto vec : path) {
+    string vec_string = vector_to_string(vec);
+    ret += vec_string + " ";
+  }
+  return ret;
+}
 
 /**
  * Initialize the pockets as a vector of Vector2ds.
@@ -597,20 +633,30 @@ void populate_ball_to_pocket_obstructions_table()
 
 /**
  * Calculates the ghost ball position for a given ball shot into a particular pocket.
+ * Does not take table edges into account.
  */
-Vector2d get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &pocket)
+ghost_ball_struct get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &pocket)
 {
+  ghost_ball_struct ghost_ball;
   Vector2d pocket_to_ball = ball - pocket;
-  return ball + pocket_to_ball.normalized() * BALL_DIAMETER;
+  ghost_ball.coords = ball + pocket_to_ball.normalized() * BALL_DIAMETER;
+  if (ghost_ball.coords.x() < 0 || ghost_ball.coords.x() > WIDTH ||
+    ghost_ball.coords.y() < 0 || ghost_ball.coords.y() > LENGTH) {
+      ghost_ball.possible = false;
+  } else {
+    ghost_ball.possible = true;
+  }
+  return ghost_ball;
 }
 
 /**
  * Populates the ghost ball position table.
  * This function relies on {@code object_balls}, {@code eight_ball}, and {@code pockets} being populated.
+ * Does not take table edges into account.
  */
 void populate_ghost_ball_position_table()
 {
-  ghost_ball_position_table = vector<vector<Vector2d>>(object_balls.size() + 1, vector<Vector2d>(pockets.size()));
+  ghost_ball_position_table = vector<vector<ghost_ball_struct>>(object_balls.size() + 1, vector<ghost_ball_struct>(pockets.size()));
   for (unsigned char p = 0; p < pockets.size(); ++p)
   {
     for (unsigned char o = 0; o < object_balls.size(); ++o)
@@ -647,19 +693,23 @@ void populate_shot_info_table_obstructions()
       // Might need to be careful in this copy of a struct, but it works right now.
       // The set<unsigned char> appears to be copied by value, not reference.
       obstructions_struct ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
-      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
+      ghost_ball_struct ghost_ball_position = ghost_ball_position_table[o][p];
       for (unsigned char w = 0; w <= WIDTH; ++w)
       {
         for (unsigned char l = 0; l <= LENGTH; ++l)
         {
           shot_info_struct &shot_info = shot_info_table[w][l][o][p];
+          if (!ghost_ball_position.possible) {
+            shot_info.shot_obstructions.has_permanent_obstruction = true;
+            continue;
+          }
           shot_info.shot_obstructions = ball_to_pocket_obstructions;
           if (ball_to_pocket_obstructions.has_permanent_obstruction)
           {
             continue;
           }
           Vector2d cue_ball = Vector2d(w, l);
-          obstructions_struct cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position, false);
+          obstructions_struct cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position.coords, false);
           if (cue_to_object_obstructions.has_permanent_obstruction)
           {
             shot_info.shot_obstructions.has_permanent_obstruction = true;
@@ -742,14 +792,19 @@ void populate_shot_info_table_difficulty()
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)
     {
-      const Vector2d &ghost_ball_position = ghost_ball_position_table[o][p];
+      const ghost_ball_struct &ghost_ball_position = ghost_ball_position_table[o][p];
       for (unsigned char w = 0; w <= WIDTH; ++w)
       {
         for (unsigned char l = 0; l <= LENGTH; ++l)
         {
           shot_info_struct &shot_info = shot_info_table[w][l][o][p];
-          shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position, p);
-          shot_info.weighted_difficulty = shot_info.difficulty * shot_info.difficulty;
+          if (!ghost_ball_position.possible) {
+            shot_info.difficulty = std::numeric_limits<float>::infinity();
+            shot_info.weighted_difficulty = std::numeric_limits<float>::infinity();
+          } else {
+            shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position.coords, p);
+            shot_info.weighted_difficulty = shot_info.difficulty * shot_info.difficulty;
+          }
         }
       }
     }
@@ -994,6 +1049,7 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
         cue_ball_location, cue_ball_destination, distance_to_travel);
   }
   ret.push_back(cue_ball_destination);
+
   return ret;
 }
 
@@ -1011,19 +1067,20 @@ void populate_shot_path_table()
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)
     {
-      const Vector2d &ghost_ball_position = ghost_ball_position_table[o][p];
+      const ghost_ball_struct &ghost_ball_position = ghost_ball_position_table[o][p];
       for (unsigned char w = 0; w <= WIDTH; ++w)
       {
         for (unsigned char l = 0; l <= LENGTH; ++l)
         {
-          shot_angle_struct shot_angle = get_shot_angle(Vector2d(w, l), ghost_ball_position, pockets[p]);
+          shot_angle_struct shot_angle = get_shot_angle(Vector2d(w, l), ghost_ball_position.coords, pockets[p]);
           for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
           {
             for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
             {
               shot_path_struct &current_shot_path = shot_path_table[w][l][o][p][st][sp];
               current_shot_path.within_acceptable_difficulty = false;
-              if (shot_info_table[w][l][o][p].difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
+              if (!ghost_ball_position.possible ||
+                shot_info_table[w][l][o][p].difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
               {
                 continue;
               }
@@ -1119,12 +1176,12 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
               {
                 continue;
               }
+              int next_combo = combo - (1 << ball);
               unsigned char rounded_x = (unsigned char)(0.5 + current_shot_path.final_position.x());
               unsigned char rounded_y = (unsigned char)(0.5 + current_shot_path.final_position.y());
-              if (!selected_shot_table[rounded_x][rounded_y][combo - (1 << ball)].possible) {
+              if (!selected_shot_table[rounded_x][rounded_y][next_combo].possible) {
                 continue;
               }
-              unsigned char next_combo = combo - (1 << ball);
               float new_weighted_difficulty = current_shot_info.weighted_difficulty + selected_shot_table[rounded_x][rounded_y][next_combo].total_weighted_difficulty;
               if (new_weighted_difficulty < selected_shot.total_weighted_difficulty)
               {
@@ -1216,10 +1273,6 @@ string zero_based_index_to_one_based_index_string(unsigned char index) {
   return to_string(index + 1);
 }
 
-string vector_to_string(Vector2d vec) {
-  return "(" + to_string(vec.x()) + ", " + to_string(vec.y()) + ")";
-}
-
 string object_ball_index_to_string(unsigned char index) {
   Vector2d object_ball;
   string ret = "";
@@ -1270,17 +1323,12 @@ string spin_to_string(unsigned char spin_index) {
   return "";
 }
 
-string unsigned_char_coordinates_struct_to_string(unsigned_char_coordinates_struct coordinates) {
-  return "(" + to_string(coordinates.x) + ", " + to_string(coordinates.y) + ")";
+string strength_to_string(unsigned char strength) {
+  return to_string(strength + 1) + " - " + to_string((int) round(strength_to_distance(strength) / (MAX_DIAMONDS * UNITS_PER_DIAMOND) * 100)) + "%";
 }
 
-string path_to_string(vector<Vector2d> path) {
-  string ret = "";
-  for (auto vec : path) {
-    string vec_string = vector_to_string(vec);
-    ret += vec_string + " ";
-  }
-  return ret;
+string unsigned_char_coordinates_struct_to_string(unsigned_char_coordinates_struct coordinates) {
+  return "(" + to_string(coordinates.x) + ", " + to_string(coordinates.y) + ")";
 }
 
 void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue_ball) {
@@ -1316,7 +1364,7 @@ void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue
     cout << "Object ball target: " << object_ball_index_to_string(selected_shot.object_ball) << endl;
     cout << "Pocket: " << pocket_to_string(selected_shot.pocket) << endl;
     cout << "Difficulty from this shot onwards: " << selected_shot.total_weighted_difficulty << endl;
-    cout << "Strength (1-" << to_string(NUM_STRENGTHS) << "): " << zero_based_index_to_one_based_index_string(selected_shot.strength) << endl;
+    cout << "Strength (1-" << to_string(NUM_STRENGTHS) << "): " << strength_to_string(selected_shot.strength) << endl;
     cout << "Spin: " << spin_to_string(selected_shot.spin) << endl;
     cout << "Cue ball path: " << path_to_string(selected_shot.path_segments) << endl;
     if (combo == 0) {
