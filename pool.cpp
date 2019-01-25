@@ -14,7 +14,11 @@ int main()
   cout << endl;
   auto start = std::chrono::system_clock::now();
 
+  bool get_ball_in_hand_solution = true;
   eight_ball = Vector2d(UNITS_PER_DIAMOND, 12);
+  unsigned_char_coordinates_struct cue_ball;
+  cue_ball.x = 3;
+  cue_ball.y = 5;
   object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND));
   object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2));
 
@@ -27,12 +31,16 @@ int main()
   populate_shot_path_table();
   populate_selected_shot_table();
 
-  cout << selected_shot_table[0][3][3].possible << endl;
-  for (auto x : selected_shot_table[0][3][3].path_segments) {
-    cout << x << endl;
+  if (get_ball_in_hand_solution) {
+    ball_in_hand_solution_struct ball_in_hand_solution = find_ball_in_hand_solution();
+    if (!ball_in_hand_solution.possible) {
+      cout << "No solution" << endl;
+    } else {
+      display_solution(true, ball_in_hand_solution.coordinates);
+    }
+  } else {
+    display_solution(false, cue_ball);
   }
-  cout << (int) selected_shot_table[0][3][3].next_x << endl;
-  cout << (int) selected_shot_table[0][3][3].next_y << endl;
   auto end = std::chrono::system_clock::now();
 
   std::chrono::duration<double> elapsed_seconds = end - start;

@@ -3,6 +3,7 @@
 #include <set>
 #include <chrono>
 #include <ctime>
+#include <string>
 
 #include "Eigen/Dense"
 using namespace Eigen;
@@ -64,6 +65,36 @@ struct segment_range_struct
    * The maximum y coordinate of the segments given.
    */
   float max_y;
+};
+
+/**
+ * Holds coordinate information in unsigned chars.
+ */
+struct unsigned_char_coordinates_struct
+{
+  /**
+   * The x coordinate.
+   */
+  unsigned char x;
+  /**
+   * The y coordinate.
+   */
+  unsigned char y;
+};
+
+/**
+ * Holds information about ball in hand.
+ */
+struct ball_in_hand_solution_struct
+{
+  /**
+   * Whether there is a solution or not.
+   */
+  bool possible = false;
+  /**
+   * The coordinates.
+   */
+  unsigned_char_coordinates_struct coordinates;
 };
 
 /**
@@ -205,12 +236,50 @@ struct selected_shot_struct
   vector<Vector2d> path_segments;
   /**
    * The next x-coordinate of the cue ball after this shot.
+   * Only populated if possible is true.
    */
   unsigned char next_x;
   /**
    * The next y-coordinate of the cue ball after this shot.
+   * Only populated if possible is true.
    */
   unsigned char next_y;
+  /**
+   * The combination of object balls for the next shot, if any.
+   * Only populated if possible is true.
+   */
+  unsigned char next_combo;
+};
+
+/**
+ * Information about the best runout given ball in hand.
+ */
+struct solution_struct
+{
+  /**
+   * Whether the shot is possible or not.
+   */
+  bool possible = false;
+  /**
+   * The starting x-coordinate of the cue ball. Only applicable if this is ball in hand.
+   * Only populated if possible is true.
+   */
+  unsigned char cue_ball_x;
+  /**
+   * The starting y-coordinate of the cue ball. Only applicable if this is ball in hand.
+   * Only populated if possible is true.
+   */
+  unsigned char cue_ball_y;
+  /**
+   * The list of selected_shot_structs representing the shots taken.
+   * Only populated if possible is true.
+   */
+  vector<selected_shot_struct> shots;
+  /**
+   * The total weighted difficulty of the runout starting from this ball.
+   * Only populated if possible is true.
+   */
+  float total_weighted_difficulty = std::numeric_limits<float>::infinity();
 };
 
 /**
@@ -253,10 +322,6 @@ vector<Vector2d> pockets;
  * The position of the eight ball.
  */
 Vector2d eight_ball;
-/**
- * The initial position of the cue ball.
- */
-Vector2d cue_ball;
 /**
  * The position of our object balls.
  */
@@ -1059,9 +1124,11 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
               if (!selected_shot_table[rounded_x][rounded_y][combo - (1 << ball)].possible) {
                 continue;
               }
-              float new_weighted_difficulty = current_shot_info.weighted_difficulty + selected_shot_table[rounded_x][rounded_y][combo - (1 << ball)].total_weighted_difficulty;
+              unsigned char next_combo = combo - (1 << ball);
+              float new_weighted_difficulty = current_shot_info.weighted_difficulty + selected_shot_table[rounded_x][rounded_y][next_combo].total_weighted_difficulty;
               if (new_weighted_difficulty < selected_shot.total_weighted_difficulty)
               {
+                selected_shot.next_combo = next_combo;
                 selected_shot.possible = true;
                 selected_shot.strength = st;
                 selected_shot.spin = sp;
@@ -1126,6 +1193,141 @@ void populate_selected_shot_table()
   {
     process_object_ball_combinations(object_balls.size(), i);
   }
+}
+
+const ball_in_hand_solution_struct find_ball_in_hand_solution() {
+  unsigned char max_object_ball_index = (unsigned char) pow(2, object_balls.size()) - 1;
+  ball_in_hand_solution_struct ball_in_hand_solution;
+  float minimum_difficulty = std::numeric_limits<float>::infinity();
+  for (unsigned char w = 0; w <= WIDTH; ++w) {
+    for (unsigned char l = 0; l <= LENGTH; ++l) {
+      if (selected_shot_table[w][l][max_object_ball_index].total_weighted_difficulty < minimum_difficulty) {
+        ball_in_hand_solution.possible = true;
+        ball_in_hand_solution.coordinates.x = w;
+        ball_in_hand_solution.coordinates.y = l;
+        minimum_difficulty = selected_shot_table[w][l][max_object_ball_index].total_weighted_difficulty;
+      }
+    }
+  }
+  return ball_in_hand_solution;
+}
+
+string zero_based_index_to_one_based_index_string(unsigned char index) {
+  return to_string(index + 1);
+}
+
+string vector_to_string(Vector2d vec) {
+  return "(" + to_string(vec.x()) + ", " + to_string(vec.y()) + ")";
+}
+
+string object_ball_index_to_string(unsigned char index) {
+  Vector2d object_ball;
+  string ret = "";
+  if (index == object_balls.size()) {
+    ret = "Eight ball";
+    object_ball = eight_ball;
+  } else {
+    ret = zero_based_index_to_one_based_index_string(index);
+    object_ball = object_balls[index];
+  }
+  ret += " " + vector_to_string(object_ball);
+  return ret;
+}
+
+string pocket_to_string(unsigned char pocket_index) {
+  switch (pocket_index) {
+    case 0:
+      return "bottom left";
+    case 1:
+      return "bottom right";
+    case 2:
+      return "middle left";
+    case 3:
+      return "middle right";
+    case 4:
+      return "top left";
+    case 5:
+      return "top right";
+  }
+  return "";
+}
+
+// TODO: This hacks everything to a spin of stun.
+string spin_to_string(unsigned char spin_index) {
+  return "stun";
+  switch (spin_index) {
+    case 0:
+      return "heavy draw";
+    case 1:
+      return "light draw";
+    case 2:
+      return "stun";
+    case 3:
+      return "light follow";
+    case 4:
+      return "heavy follow";
+  }
+  return "";
+}
+
+string unsigned_char_coordinates_struct_to_string(unsigned_char_coordinates_struct coordinates) {
+  return "(" + to_string(coordinates.x) + ", " + to_string(coordinates.y) + ")";
+}
+
+string path_to_string(vector<Vector2d> path) {
+  string ret = "";
+  for (auto vec : path) {
+    string vec_string = vector_to_string(vec);
+    ret += vec_string + " ";
+  }
+  return ret;
+}
+
+void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue_ball) {
+  unsigned char combo = (unsigned char) pow(2, object_balls.size()) - 1;
+
+  unsigned_char_coordinates_struct coords = cue_ball;
+  unsigned char shot_number = 1;
+  cout << endl;
+  cout << "Table layout: " << endl;
+  cout << "-------------" << endl;
+  cout << "Ball in hand: " << (is_ball_in_hand ? "True" : "False") << endl;
+  cout << "Cue ball: " << unsigned_char_coordinates_struct_to_string(cue_ball) << endl;
+  cout << "Eight ball: " << vector_to_string(eight_ball) << endl;
+  cout << "Object balls: ";
+  for (unsigned char o = 0; o < object_balls.size(); ++o) {
+    cout << vector_to_string(object_balls[o]) << " ";
+  }
+  cout << endl;
+  cout << "Opponent balls: ";
+  for (unsigned char o = 0; o < opponent_object_balls.size(); ++o) {
+    cout << vector_to_string(opponent_object_balls[o]) << " ";
+  }
+  cout << endl;
+  do {
+    selected_shot_struct selected_shot = selected_shot_table[coords.x][coords.y][combo];
+    if (!selected_shot.possible) {
+      cout << "No solution." << endl;
+      return;
+    }
+    cout << "\nShot " << (int) shot_number << ":\n";
+    cout << "-------\n";
+    cout << "Cue ball position: " + unsigned_char_coordinates_struct_to_string(coords) + "\n";
+    cout << "Object ball target: " << object_ball_index_to_string(selected_shot.object_ball) << endl;
+    cout << "Pocket: " << pocket_to_string(selected_shot.pocket) << endl;
+    cout << "Difficulty from this shot onwards: " << selected_shot.total_weighted_difficulty << endl;
+    cout << "Strength (1-" << to_string(NUM_STRENGTHS) << "): " << zero_based_index_to_one_based_index_string(selected_shot.strength) << endl;
+    cout << "Spin: " << spin_to_string(selected_shot.spin) << endl;
+    cout << "Cue ball path: " << path_to_string(selected_shot.path_segments) << endl;
+    if (combo == 0) {
+      break;
+    }
+    coords.x = selected_shot.next_x;
+    coords.y = selected_shot.next_y;
+    combo = selected_shot.next_combo;
+    shot_number += 1;
+  } while(true);
+  cout << "Done" << endl;
 }
 
 /*
