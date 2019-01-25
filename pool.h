@@ -15,11 +15,15 @@ using namespace std;
 /**
  * Whether or not a shot is obstructed and whether it can become unobstructed.
  */
-struct obstructions
+struct obstructions_struct
 {
-  // Whether the shot is impossible by non-player balls or not.
-  bool has_permanent_obstruction = false;
-  // The set indices of of player object balls obstructing the shot.
+  /**
+   * A shot is permanently obstructed if blocked by the 8 ball or opponent object balls.
+   */
+  bool has_permanent_obstruction = true;
+  /**
+   * Obstructing object balls belonging to the player are listed here.
+   */
   set<unsigned char> obstructing_object_balls;
 };
 
@@ -28,7 +32,13 @@ struct obstructions
  */
 struct segment_intersection_struct
 {
+  /**
+   * Whether or not there is an intersection between the line segments.
+   */
   bool has_intersection = false;
+  /**
+   * If there is an intersection point, these are the coordiantes.
+   */
   Vector2d intersection_point;
 };
 
@@ -37,11 +47,21 @@ struct segment_intersection_struct
  */
 struct rail_reflection_struct
 {
+  /**
+   * Whether or not there is an intersection between the line segments.
+   */
   bool has_intersection = false;
+  /**
+   * If there is an intersection point, these are the coordiantes.
+   */
   Vector2d intersection_point;
-  // The new end point of the segment after bouncing off any rail of the pool table.
+  /**
+   * After reflection off the rail, this is the new end point of the cue ball.
+   */ 
   Vector2d end_point;
-  // The distance the ball traveled along this path after hitting the rail to get to the end point.
+  /**
+   * The distance the ball traveled along this path after hitting the rail to get to the end point.
+   */
   float distance_traveled_after_rail;
 };
 
@@ -50,9 +70,21 @@ struct rail_reflection_struct
  */
 struct segment_range_struct
 {
+  /**
+   * The minimum x coordinate of the segments given.
+   */
   float min_x;
+  /**
+   * The maximum x coordinate of the segments given.
+   */
   float max_x;
+  /**
+   * The minimum y coordinate of the segments given.
+   */
   float min_y;
+  /**
+   * The maximum y coordinate of the segments given.
+   */
   float max_y;
 };
 
@@ -61,18 +93,33 @@ struct segment_range_struct
  */
 struct selected_shot_struct
 {
+  /**
+   * Whether the shot is possible or not.
+   */
   bool possible = false;
-  // The strength of the shot.
+  /**
+   * The strength of the shot. (0..NUM_STRENGTHS)
+   */
   unsigned char strength;
-  // The spin of the shot.
+  /**
+   * The spin of the shot. (0..NUM_SPINS)
+   */
   unsigned char spin;
-  // The index of the object ball to shoot.
+  /**
+   * The index of the object ball to shoot. The eight ball is at object_balls.size().
+   */
   unsigned char object_ball;
-  // Which pocket to shoot the ball into.
+  /**
+   * Which pocket index to shoot the ball into.
+   */
   unsigned char pocket;
-  // The total weighted difficulty of the shot from here on out.
+  /**
+   * The total weighted difficulty of the runout starting from this ball.
+   */
   float total_weighted_difficulty = std::numeric_limits<float>::infinity();
-  // The line segments that make up the shot path.
+  /**
+   * The points defining the line segments the cue ball travels along after contact with the object ball.
+   */
   vector<Vector2d> path_segments;
 };
 
@@ -101,94 +148,143 @@ struct shot_angle_struct
 /**
  * The information about the cue ball path after a shot.
  */
-struct shot_path
+struct shot_path_struct
 {
-  // The line segments that make up the shot path.
+  /**
+   * The line segments that make up the shot path.
+   */
   vector<Vector2d> path_segments;
-  // The obstructions along this path.
-  obstructions shot_obstructions;
-  // The final location of the cue ball along this path.
+  /**
+   * The obstructions along this path.
+   */
+  obstructions_struct shot_obstructions;
+  /**
+   * The final location of the cue ball along this path.
+   */
   Vector2d final_position;
-  // Whether the shot path is possible or not. This is based on whether the shot is too difficult or not.
-  // If this is true, the shot path is not populated.
-  bool not_too_difficult = false;
+  /**
+   * Whether the shot path is possible or not. This is based on whether the shot is too difficult or not.
+   * If this is false, the shot path is not populated.
+   */
+  bool within_acceptable_difficulty = false;
 };
 
-// The possible information with regards to a shot
-struct shot_info
+/**
+ * The possible information with regards to a shot.
+ */
+struct shot_info_struct
 {
-  float difficulty = 0;
-  // The weighted difficulty of the shot so that we can just add numbers together when considering runout paths.
-  // TODO: Make this weighting more accurate.
-  float weighted_difficulty = 0;
-  obstructions shot_obstructions; // The obstructions for this shot.
+  /**
+   * The difficulty of the shot.
+   */
+  float difficulty = std::numeric_limits<float>::infinity();
+  /**
+   * The weighted difficulty of the shot so that we can just add numbers together when considering runout paths.
+   * TODO: Make this weighting more accurate.
+   */
+  float weighted_difficulty = std::numeric_limits<float>::infinity();
+  /**
+   * The obstructions for this shot.
+   */
+  obstructions_struct shot_obstructions;
 };
 
-// The length of a diamond in units.
-const unsigned char DIAMOND_LENGTH = 2;
-// The number of shot strengths to consider
-// TODO: Increase this to 12.
+/**
+ * The length of a diamond in units.
+ */
+const unsigned char UNITS_PER_DIAMOND = 2;
+/**
+ * The number of shot strengths to consider
+ */
 const unsigned char NUM_STRENGTHS = 12;
-// The number of shot spins to consider.
-// TODO: Increase this to 5.
+/**
+ * The number of shot spins to consider.
+ */
 const unsigned char NUM_SPINS = 5;
-// The maximum difficulty of shot to consider shooting.
-const unsigned int MAX_DIFFICULTY_SHOT_TO_CONSIDER = 200;
-// The diameter of the balls.
-const float BALL_DIAMETER = 0.18 * DIAMOND_LENGTH;
-// The width of the pool table.
-const unsigned char WIDTH = DIAMOND_LENGTH * 4;
-// The length of the pool table.
+/**
+ * The maximum difficulty of individual shot to consider shooting.
+ */
+const unsigned int MAX_DIFFICULTY_SHOT_TO_CONSIDER = 500;
+/**
+ * The unit diameter of the balls.
+ */
+const float BALL_DIAMETER = 0.18 * UNITS_PER_DIAMOND;
+/**
+ * The width of the pool table in units.
+ */
+const unsigned char WIDTH = UNITS_PER_DIAMOND * 4;
+/**
+ * The length of the pool table in units.
+ */
 const unsigned char LENGTH = WIDTH * 2;
-// The number of pockets.
-const unsigned char NUM_POCKETS = 6;
-// The maximum number of diamonds the cue ball can travel if untouched by an object ball.
+/**
+ * The maximum number of diamonds the cue ball can travel if untouched by an object ball.
+ */
 const unsigned char MAX_DIAMONDS = 30;
-// The positions of the pockets.
+/**
+ * The positions of the pockets.
+ */
 vector<Vector2d> pockets;
-// The position of the eight ball.
+/**
+ * The position of the eight ball.
+ */
 Vector2d eight_ball;
-// The initial position of the cue ball.
+/**
+ * The initial position of the cue ball.
+ */
 Vector2d cue_ball;
-// The initial position of our object balls.
+/**
+ * The position of our object balls.
+ */
 vector<Vector2d> object_balls;
-// The initial position of our opponent's object balls.
+/**
+ * The position of our opponent's object balls.
+ */
 vector<Vector2d> opponent_object_balls;
-// The bottom edge of the pool table.
+/**
+ * The bottom edge of the pool table.
+ */
 vector<Vector2d> bottom_edge;
-// The right edge of the pool table.
+/**
+ * The right edge of the pool table.
+ */
 vector<Vector2d> right_edge;
-// The top edge of the pool table.
+/**
+ * The top edge of the pool table.
+ */
 vector<Vector2d> top_edge;
-// The left edge of the pool table.
+/**
+ * The left edge of the pool table.
+ */
 vector<Vector2d> left_edge;
 
 /**
  * A table of obstructions from each object ball index to a given pocket. Includes the 8 ball at index
- * object_balls.size() + 1. This is only used to help populate shot_obstructions.
+ * object_balls.size(). This is only used to help populate shot_obstructions.
  * Dimensions are [Object balls Size + 1][Pockets]
  */
-vector<vector<obstructions>> ball_to_pocket_obstructions_table;
+vector<vector<obstructions_struct>> ball_to_pocket_obstructions_table;
 
 /**
  * A table of ghost ball positions for a given object ball index to a pocket. Includes the 8 ball at index
- * object_balls.size() + 1.
+ * object_balls.size().
  * Dimensions are [Object balls Size + 1][Pockets]
  */
 vector<vector<Vector2d>> ghost_ball_position_table;
 
 /**
  * A table of shot infos including obstruction information and difficulty. Includes the 8 ball at index
- * object_balls.size() + 1.
- * Dimensions are [Width][Length][Object balls Size + 1][Pockets]
+ * object_balls.size().
+ * Dimensions are [Width + 1][Length + 1][Object balls Size + 1][Pockets]
  */
-vector<vector<vector<vector<shot_info>>>> shot_info_table;
+vector<vector<vector<vector<shot_info_struct>>>> shot_info_table;
 
 /**
  * A table of possible paths given a cue ball, object ball, pocket, strength, and spin. Includes the 8 ball at index
- * object_balls.size() + 1.
+ * object_balls.size().
+ * Dimensions are [Width + 1][Length + 1][Object balls Size + 1][Pockets][Strength][Spin].
  */
-vector<vector<vector<vector<vector<vector<shot_path>>>>>> shot_path_table;
+vector<vector<vector<vector<vector<vector<shot_path_struct>>>>>> shot_path_table;
 
 /**
  * Gets the best shot path to for each given cue ball position for the given layout.
@@ -196,6 +292,7 @@ vector<vector<vector<vector<vector<vector<shot_path>>>>>> shot_path_table;
  * by summing the (2^object ball indices) of the remaining balls. That is, if there are
  * 3 object balls, their indices will be 1,2,4. A table which consists of balls 1 and
  * 3 will be in position 5. The table with only the 8 ball remaining is at position 0.
+ * Dimensions are [Width + 1][Length + 1][Num table layouts].
  */
 vector<vector<vector<selected_shot_struct>>> selected_shot_table;
 
@@ -324,14 +421,13 @@ bool ball_intersects_segment(const Vector2d &ball, const Vector2d &segment_start
  * Has a param for whether or not to include pockets.
  * TODO: Make pocket handling a bit more precise.
  */
-obstructions get_obstructions_on_segment_for_shot(unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool consider_pockets)
+obstructions_struct get_obstructions_on_segment_for_shot(unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool consider_pockets)
 {
-  obstructions obstructions;
+  obstructions_struct obstructions;
   for (unsigned char i = 0; i < opponent_object_balls.size(); ++i)
   {
     if (ball_intersects_segment(opponent_object_balls[i], segment_start, segment_end))
     {
-      obstructions.has_permanent_obstruction = true;
       return obstructions;
     }
   }
@@ -341,16 +437,15 @@ obstructions get_obstructions_on_segment_for_shot(unsigned char object_ball_inde
     {
       if (ball_intersects_segment(pockets[i], segment_start, segment_end))
       {
-        obstructions.has_permanent_obstruction = true;
         return obstructions;
       }
     }
   }
   if (object_ball_index != object_balls.size() && ball_intersects_segment(eight_ball, segment_start, segment_end))
   {
-    obstructions.has_permanent_obstruction = true;
     return obstructions;
   }
+  obstructions.has_permanent_obstruction = false;
   if (object_ball_index != object_balls.size())
   {
     for (unsigned char i = 0; i < object_balls.size(); ++i)
@@ -583,7 +678,7 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
  */
 float strength_to_distance(unsigned char strength)
 {
-  return 1.0 * strength * MAX_DIAMONDS / NUM_STRENGTHS * DIAMOND_LENGTH;
+  return 1.0 * strength * MAX_DIAMONDS / NUM_STRENGTHS * UNITS_PER_DIAMOND;
 }
 
 /**
@@ -619,18 +714,18 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
  */
 void populate_shot_info_table_obstructions()
 {
-  shot_info_table = vector<vector<vector<vector<shot_info>>>>(WIDTH + 1, vector<vector<vector<shot_info>>>(LENGTH + 1, vector<vector<shot_info>>(object_balls.size() + 1, vector<shot_info>(pockets.size()))));
+  shot_info_table = vector<vector<vector<vector<shot_info_struct>>>>(WIDTH + 1, vector<vector<vector<shot_info_struct>>>(LENGTH + 1, vector<vector<shot_info_struct>>(object_balls.size() + 1, vector<shot_info_struct>(pockets.size()))));
   for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)
     {
-      obstructions ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
+      obstructions_struct ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
       Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
       for (unsigned char w = 0; w <= WIDTH; ++w)
       {
         for (unsigned char l = 0; l <= LENGTH; ++l)
         {
-          shot_info &shot_info = shot_info_table[w][l][o][p];
+          shot_info_struct &shot_info = shot_info_table[w][l][o][p];
           shot_info.shot_obstructions = ball_to_pocket_obstructions;
           if (ball_to_pocket_obstructions.has_permanent_obstruction)
           {
@@ -640,10 +735,10 @@ void populate_shot_info_table_obstructions()
           obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position, false);
           if (cue_to_object_obstructions.has_permanent_obstruction)
           {
-            shot_info.shot_obstructions.has_permanent_obstruction = true;
             shot_info.shot_obstructions.obstructing_object_balls.clear();
             continue;
           }
+          shot_info.shot_obstructions.has_permanent_obstruction = false;
           insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
         }
       }
@@ -689,7 +784,7 @@ void populate_shot_info_table_difficulty()
       {
         for (unsigned char l = 0; l <= LENGTH; ++l)
         {
-          shot_info &shot_info = shot_info_table[w][l][o][p];
+          shot_info_struct &shot_info = shot_info_table[w][l][o][p];
           shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position, pockets[p]);
           shot_info.weighted_difficulty = shot_info.difficulty * shot_info.difficulty;
         }
@@ -706,7 +801,7 @@ void populate_shot_info_table_difficulty()
  */
 void populate_shot_path_table()
 {
-  shot_path_table = vector<vector<vector<vector<vector<vector<shot_path>>>>>>(WIDTH + 1, vector<vector<vector<vector<vector<shot_path>>>>>(LENGTH + 1, vector<vector<vector<vector<shot_path>>>>(object_balls.size() + 1, vector<vector<vector<shot_path>>>(pockets.size(), vector<vector<shot_path>>(NUM_STRENGTHS, vector<shot_path>(NUM_SPINS))))));
+  shot_path_table = vector<vector<vector<vector<vector<vector<shot_path_struct>>>>>>(WIDTH + 1, vector<vector<vector<vector<vector<shot_path_struct>>>>>(LENGTH + 1, vector<vector<vector<vector<shot_path_struct>>>>(object_balls.size() + 1, vector<vector<vector<shot_path_struct>>>(pockets.size(), vector<vector<shot_path_struct>>(NUM_STRENGTHS, vector<shot_path_struct>(NUM_SPINS))))));
   for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
   {
     for (unsigned char p = 0; p < pockets.size(); ++p)
@@ -721,12 +816,12 @@ void populate_shot_path_table()
           {
             for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
             {
-              shot_path &current_shot_path = shot_path_table[w][l][o][p][st][sp];
+              shot_path_struct &current_shot_path = shot_path_table[w][l][o][p][st][sp];
               if (shot_info_table[w][l][o][p].difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
               {
                 continue;
               }
-              current_shot_path.not_too_difficult = true;
+              current_shot_path.within_acceptable_difficulty = true;
               vector<Vector2d> path = get_path(shot_angle, st, sp);
               current_shot_path.path_segments = path;
               current_shot_path.final_position = path[path.size() - 1];
@@ -735,9 +830,9 @@ void populate_shot_path_table()
                 obstructions obstructions_on_segment = get_obstructions_on_segment_for_shot(o, path[pa], path[pa + 1], true);
                 if (obstructions_on_segment.has_permanent_obstruction)
                 {
-                  current_shot_path.shot_obstructions.has_permanent_obstruction = true;
                   break;
                 }
+                current_shot_path.shot_obstructions.has_permanent_obstruction = false;
                 insert_into_set(current_shot_path.shot_obstructions.obstructing_object_balls, obstructions_on_segment.obstructing_object_balls);
               }
             }
@@ -758,7 +853,7 @@ void populate_eight_ball_in_selected_shot_table()
       selected_shot_struct &selected_shot = selected_shot_table[w][l][0];
       for (unsigned char p = 0; p < pockets.size(); ++p)
       {
-        shot_info &current_shot_info = shot_info_table[w][l][object_balls.size()][p];
+        shot_info_struct &current_shot_info = shot_info_table[w][l][object_balls.size()][p];
         if (!current_shot_info.shot_obstructions.has_permanent_obstruction && current_shot_info.difficulty <= MAX_DIFFICULTY_SHOT_TO_CONSIDER &&
             current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
         {
@@ -786,7 +881,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
         selected_shot_struct &selected_shot = selected_shot_table[w][l][ball];
         for (unsigned char p = 0; p < pockets.size(); ++p)
         {
-          shot_info &current_shot_info = shot_info_table[w][l][ball][p];
+          shot_info_struct &current_shot_info = shot_info_table[w][l][ball][p];
           if (!current_shot_info.shot_obstructions.has_permanent_obstruction && current_shot_info.difficulty <= MAX_DIFFICULTY_SHOT_TO_CONSIDER &&
               current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
           {
@@ -794,8 +889,8 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
             {
               for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
               {
-                shot_path &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
-                if (!current_shot_path.not_too_difficult || current_shot_path.shot_obstructions.has_permanent_obstruction)
+                shot_path_struct &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
+                if (!current_shot_path.within_acceptable_difficulty || current_shot_path.shot_obstructions.has_permanent_obstruction)
                 {
                   continue;
                 }
@@ -827,8 +922,10 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
   }
 }
 
-// Process a given combination of object balls.
-// combo represents the indices of object balls to consider. It is represented as a number
+/**
+ * Process a given combination of object balls.
+ * combo represents the indices of object balls to consider. It is represented as a number.
+ */
 void process_object_ball_combination(int num_object_balls, int combo)
 {
   set<unsigned char> balls;
@@ -840,7 +937,9 @@ void process_object_ball_combination(int num_object_balls, int combo)
   populate_single_combination_in_selected_shot_table(combo, balls);
 }
 
-// Gets all possible combinations of k elements from the range (1..c) inclusive.
+/**
+ * Gets all possible combinations of k elements from the range (1..c) inclusive.
+ */
 void process_object_ball_combinations(int num_object_balls, int num_elements)
 {
   int n = num_object_balls;
@@ -859,7 +958,9 @@ void process_object_ball_combinations(int num_object_balls, int num_elements)
   }
 }
 
-// Populates the selected shot table.
+/**
+ * Populates the selected shot table.
+ */
 void populate_selected_shot_table()
 {
   selected_shot_table = vector<vector<vector<selected_shot_struct>>>(WIDTH + 1, vector<vector<selected_shot_struct>>(LENGTH + 1, vector<selected_shot_struct>(object_balls.size() * object_balls.size())));
@@ -886,7 +987,7 @@ std::ostream &operator<<(std::ostream &o, const obstructions &obstructions)
   return o;
 }
 
-std::ostream &operator<<(std::ostream &o, const shot_info &shot_info)
+std::ostream &operator<<(std::ostream &o, const shot_info_struct &shot_info)
 {
   o << shot_info.difficulty << endl;
   o << shot_info.shot_obstructions << endl;
