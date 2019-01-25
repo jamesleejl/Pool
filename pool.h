@@ -38,30 +38,33 @@ struct segment_intersection_struct
    */
   bool has_intersection = false;
   /**
-   * If there is an intersection point, these are the coordiantes.
+   * The coordinates of the intersection. Only populated if has_intersection is false.
    */
   Vector2d intersection_point;
 };
 
 /**
- * Holds information about a ball path after reflection off a rail of a pool table.
+ * Holds information about a ball path after reflection off a single rail of a pool table.
  */
-struct rail_reflection_struct
+struct single_rail_reflection_struct
 {
   /**
-   * Whether or not there is an intersection between the line segments.
+   * Whether or not the ball was reflected off this rail.
    */
-  bool has_intersection = false;
+  bool has_reflection = false;
   /**
-   * If there is an intersection point, these are the coordiantes.
+   * The intersection point with the rail.
+   * Only populated if has_reflection is true.
    */
   Vector2d intersection_point;
   /**
    * After reflection off the rail, this is the new end point of the cue ball.
+   * Only populated if has_reflection is true.
    */ 
   Vector2d end_point;
   /**
    * The distance the ball traveled along this path after hitting the rail to get to the end point.
+   * Only populated if has_reflection is true.
    */
   float distance_traveled_after_rail;
 };
@@ -431,7 +434,7 @@ unsigned char eight_ball_index() {
  * @param object_ball_index the index of the object ball we are shooting at. It is not populated into the list of 
  * obstructions since it cannot obstruct itself. The eight ball is represented by an index of eight_ball_index().
  * @param consider_pockets whether or not to include the pockets on the list of possible obstructions. 
- * TODO: Make pocket handling a bit more precise.
+ * TODO: Note which obstructions can be hit softly without consequences.
  */
 obstructions_struct get_obstructions_on_segment_for_shot(
   unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool consider_pockets)
@@ -525,6 +528,46 @@ void populate_ghost_ball_position_table()
   }
 }
 
+
+/**
+ * Populates the shot info table obstructions.
+ * Relies on initialize_pockets and populate_ball_to_pocket_obstructions_table, populate_ghost_ball_table.
+ * TODO: Up to here.
+ */
+void populate_shot_info_table_obstructions()
+{
+  shot_info_table = vector<vector<vector<vector<shot_info_struct>>>>(WIDTH + 1, vector<vector<vector<shot_info_struct>>>(LENGTH + 1, vector<vector<shot_info_struct>>(object_balls.size() + 1, vector<shot_info_struct>(pockets.size()))));
+  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+  {
+    for (unsigned char p = 0; p < pockets.size(); ++p)
+    {
+      obstructions_struct ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
+      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
+      for (unsigned char w = 0; w <= WIDTH; ++w)
+      {
+        for (unsigned char l = 0; l <= LENGTH; ++l)
+        {
+          shot_info_struct &shot_info = shot_info_table[w][l][o][p];
+          shot_info.shot_obstructions = ball_to_pocket_obstructions;
+          if (ball_to_pocket_obstructions.has_permanent_obstruction)
+          {
+            continue;
+          }
+          Vector2d cue_ball = Vector2d(w, l);
+          obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position, false);
+          if (cue_to_object_obstructions.has_permanent_obstruction)
+          {
+            shot_info.shot_obstructions.obstructing_object_balls.clear();
+            continue;
+          }
+          shot_info.shot_obstructions.has_permanent_obstruction = false;
+          insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
+        }
+      }
+    }
+  }
+}
+
 /**
  * Modifies set 1 by adding all the elements from set 2.
  */
@@ -581,7 +624,7 @@ segment_intersection_struct get_intersection_of_line_segments(
   {
     return segment_intersection;
   }
-  else if (!double_equals(x, segment1_ranges.min_y) && !double_equals(x, segment1_ranges.max_y) && (y < segment2_ranges.min_y || y > segment2_ranges.max_y))
+  else if (!double_equals(y, segment2_ranges.min_y) && !double_equals(y, segment2_ranges.max_y) && (y < segment2_ranges.min_y || y > segment2_ranges.max_y))
   {
     return segment_intersection;
   }
@@ -590,6 +633,10 @@ segment_intersection_struct get_intersection_of_line_segments(
   return segment_intersection;
 }
 
+/**
+ * Gets the intersection coordinate of two line segments. This is a convenience method used to take in a two element
+ * vector used to represent pockets.
+ */
 segment_intersection_struct get_intersection_of_line_segments(
     const Vector2d &segment1_start, const Vector2d &segment1_end,
     const vector<Vector2d> &segment2) 
@@ -598,44 +645,16 @@ segment_intersection_struct get_intersection_of_line_segments(
 }
 
 /**
- * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
- */
-shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost_ball, const Vector2d &pocket)
-{
-  shot_angle_struct shot_angle;
-  shot_angle.origin = ghost_ball;
-  Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
-  Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
-  shot_angle.pocket_direction = ghost_ball_to_pocket.normalized();
-  float determinant = ghost_ball_to_cue_ball.x() * ghost_ball_to_pocket.y() - ghost_ball_to_cue_ball.y() * ghost_ball_to_pocket.x();
-  Vector2d tangent_line_direction = ghost_ball_to_pocket.unitOrthogonal();
-  if (determinant < 0)
-  {
-    shot_angle.follow_direction = shot_angle_struct::COUNTER_CLOCKWISE;
-    shot_angle.tangent_line_direction = Vector2d(-1 * tangent_line_direction.x(), -1 * tangent_line_direction.y());
-  }
-  else
-  {
-    shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
-    shot_angle.tangent_line_direction = tangent_line_direction;
-  }
-  double dot = ghost_ball_to_cue_ball.dot(ghost_ball_to_pocket);
-  float negative_cos_theta = dot / (ghost_ball_to_cue_ball.norm() * ghost_ball_to_pocket.norm());
-  shot_angle.fractional_distance = 1 - negative_cos_theta * negative_cos_theta;
-  return shot_angle;
-}
-
-/**
  * Gets the path of a ball after it bounces off table edges.
  * Depends on pocket and table edges being initialized.
  * segment_length is passed in for optimization purposes. It can also be calculated using segment_start
  * and segment_end.
  */
-rail_reflection_struct reflect_ball_path_off_table_edges(
+single_rail_reflection_struct reflect_ball_path_off_single_table_edge(
     const Vector2d &segment_start, const Vector2d &segment_end, float segment_length)
 {
-  rail_reflection_struct rail_reflection;
-  rail_reflection.has_intersection = false;
+  single_rail_reflection_struct rail_reflection;
+  rail_reflection.has_reflection = false;
   Vector2d direction_of_final_vector;
 
   if (segment_end.x() < 0)
@@ -645,7 +664,7 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
     {
       Vector2d start_to_end = segment_end - segment_start;
       direction_of_final_vector = Vector2d(-1 * start_to_end.x(), start_to_end.y()).normalized();
-      rail_reflection.has_intersection = true;
+      rail_reflection.has_reflection = true;
       rail_reflection.intersection_point = segment_intersection.intersection_point;
     }
   }
@@ -656,7 +675,7 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
     {
       Vector2d start_to_end = segment_end - segment_start;
       direction_of_final_vector = Vector2d(-1 * start_to_end.x(), start_to_end.y()).normalized();
-      rail_reflection.has_intersection = true;
+      rail_reflection.has_reflection = true;
       rail_reflection.intersection_point = segment_intersection.intersection_point;
     }
   }
@@ -667,7 +686,7 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
     {
       Vector2d start_to_end = segment_end - segment_start;
       direction_of_final_vector = Vector2d(start_to_end.x(), -1 * start_to_end.y()).normalized();
-      rail_reflection.has_intersection = true;
+      rail_reflection.has_reflection = true;
       rail_reflection.intersection_point = segment_intersection.intersection_point;
     }
   }
@@ -678,11 +697,11 @@ rail_reflection_struct reflect_ball_path_off_table_edges(
     {
       Vector2d start_to_end = segment_end - segment_start;
       direction_of_final_vector = Vector2d(start_to_end.x(), -1 * start_to_end.y()).normalized();
-      rail_reflection.has_intersection = true;
+      rail_reflection.has_reflection = true;
       rail_reflection.intersection_point = segment_intersection.intersection_point;
     }
   }
-  if (!rail_reflection.has_intersection)
+  if (!rail_reflection.has_reflection)
   {
     return rail_reflection;
   }
@@ -716,57 +735,19 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
   Vector2d cue_ball_destination = shot_angle.tangent_line_direction * distance_to_travel + shot_angle.origin;
   Vector2d cue_ball_location = shot_angle.origin;
   ret.push_back(cue_ball_location);
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
       cue_ball_location, cue_ball_destination, distance_to_travel);
-  while (rail_reflection.has_intersection)
+  while (rail_reflection.has_reflection)
   {
     ret.push_back(rail_reflection.intersection_point);
     cue_ball_location = rail_reflection.intersection_point;
     cue_ball_destination = rail_reflection.end_point;
     distance_to_travel = rail_reflection.distance_traveled_after_rail;
-    rail_reflection = reflect_ball_path_off_table_edges(
+    rail_reflection = reflect_ball_path_off_single_table_edge(
         cue_ball_location, cue_ball_destination, distance_to_travel);
   }
   ret.push_back(cue_ball_destination);
   return ret;
-}
-
-/**
- * Populates the shot info table obstructions.
- * Relies on initialize_pockets and populate_ball_to_pocket_obstructions_table, populate_ghost_ball_table.
- */
-void populate_shot_info_table_obstructions()
-{
-  shot_info_table = vector<vector<vector<vector<shot_info_struct>>>>(WIDTH + 1, vector<vector<vector<shot_info_struct>>>(LENGTH + 1, vector<vector<shot_info_struct>>(object_balls.size() + 1, vector<shot_info_struct>(pockets.size()))));
-  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
-  {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
-    {
-      obstructions_struct ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
-      Vector2d ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w <= WIDTH; ++w)
-      {
-        for (unsigned char l = 0; l <= LENGTH; ++l)
-        {
-          shot_info_struct &shot_info = shot_info_table[w][l][o][p];
-          shot_info.shot_obstructions = ball_to_pocket_obstructions;
-          if (ball_to_pocket_obstructions.has_permanent_obstruction)
-          {
-            continue;
-          }
-          Vector2d cue_ball = Vector2d(w, l);
-          obstructions cue_to_object_obstructions = get_obstructions_on_segment_for_shot(o, cue_ball, ghost_ball_position, false);
-          if (cue_to_object_obstructions.has_permanent_obstruction)
-          {
-            shot_info.shot_obstructions.obstructing_object_balls.clear();
-            continue;
-          }
-          shot_info.shot_obstructions.has_permanent_obstruction = false;
-          insert_into_set(shot_info.shot_obstructions.obstructing_object_balls, cue_to_object_obstructions.obstructing_object_balls);
-        }
-      }
-    }
-  }
 }
 
 /**
@@ -814,6 +795,34 @@ void populate_shot_info_table_difficulty()
       }
     }
   }
+}
+
+/**
+ * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
+ */
+shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost_ball, const Vector2d &pocket)
+{
+  shot_angle_struct shot_angle;
+  shot_angle.origin = ghost_ball;
+  Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
+  Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
+  shot_angle.pocket_direction = ghost_ball_to_pocket.normalized();
+  float determinant = ghost_ball_to_cue_ball.x() * ghost_ball_to_pocket.y() - ghost_ball_to_cue_ball.y() * ghost_ball_to_pocket.x();
+  Vector2d tangent_line_direction = ghost_ball_to_pocket.unitOrthogonal();
+  if (determinant < 0)
+  {
+    shot_angle.follow_direction = shot_angle_struct::COUNTER_CLOCKWISE;
+    shot_angle.tangent_line_direction = Vector2d(-1 * tangent_line_direction.x(), -1 * tangent_line_direction.y());
+  }
+  else
+  {
+    shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
+    shot_angle.tangent_line_direction = tangent_line_direction;
+  }
+  double dot = ghost_ball_to_cue_ball.dot(ghost_ball_to_pocket);
+  float negative_cos_theta = dot / (ghost_ball_to_cue_ball.norm() * ghost_ball_to_pocket.norm());
+  shot_angle.fractional_distance = 1 - negative_cos_theta * negative_cos_theta;
+  return shot_angle;
 }
 
 /**
