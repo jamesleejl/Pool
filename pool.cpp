@@ -14,13 +14,9 @@ int main()
   cout << endl;
   auto start = std::chrono::system_clock::now();
 
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH);
-  cue_ball = Vector2d(0.15, DIAMOND_LENGTH * 4);
-  for (unsigned char i = 0; i < 7; ++i)
-  {
-    object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.2 + DIAMOND_LENGTH * 0.2 * i, DIAMOND_LENGTH * 4));
-    opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 1.6 + DIAMOND_LENGTH * 0.2 * i, DIAMOND_LENGTH * 4.15));
-  }
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, 12);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2));
 
   initialize_pockets();
   initialize_table_edges();
@@ -29,9 +25,14 @@ int main()
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
   populate_shot_path_table();
-
   populate_selected_shot_table();
 
+  cout << selected_shot_table[0][3][3].possible << endl;
+  for (auto x : selected_shot_table[0][3][3].path_segments) {
+    cout << x << endl;
+  }
+  cout << (int) selected_shot_table[0][3][3].next_x << endl;
+  cout << (int) selected_shot_table[0][3][3].next_y << endl;
   auto end = std::chrono::system_clock::now();
 
   std::chrono::duration<double> elapsed_seconds = end - start;
