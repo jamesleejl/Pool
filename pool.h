@@ -11,10 +11,11 @@
 using namespace Eigen;
 using namespace std;
 
+// TODO: Extend this to python: https://docs.python.org/3/extending/building.html
 // TODO: Handle bank shots.
 // TODO: Handle side pocket shots correctly. https://billiards.colostate.edu/threads/pocket.html
 // TODO: Handle minimum distance cue ball must travel to sink an object ball for scratch purposes and other reasons.
-
+// TODO: Throttle raspberry pi? https://www.howtoforge.com/how-to-limit-cpu-usage-of-a-process-with-cpulimit-debian-ubuntu
 /**
  * Whether or not a shot is obstructed and whether it can become unobstructed.
  */
@@ -404,12 +405,24 @@ vector<vector<vector<vector<vector<vector<shot_path_struct>>>>>> shot_path_table
  */
 vector<vector<vector<selected_shot_struct>>> selected_shot_table;
 
+std::ostream &operator<<(std::ostream &o, const obstructions_struct &obstructions)
+{
+  o << "Permanent obstruction: " << obstructions.has_permanent_obstruction << endl;
+  o << "Object ball obstructions: " << endl;
+  for (unsigned char index : obstructions.obstructing_object_balls)
+  {
+    o << (int)index << " ";
+  }
+  return o;
+}
+
+// TODO: This converts to diamonds automatically.
 string vector_to_string(Vector2d vec) {
   stringstream stream;
   stream << "(";
-  stream << fixed << setprecision(1) << vec.x();
+  stream << fixed << setprecision(1) << vec.x() / UNITS_PER_DIAMOND;
   stream << ", ";
-  stream << fixed << setprecision(1) << vec.y();
+  stream << fixed << setprecision(1) << vec.y() / UNITS_PER_DIAMOND;
   stream << ")";
   return stream.str();
 }
@@ -1160,6 +1173,13 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
           {
             continue;
           }
+          set<unsigned char> intersect_cue_ball_path;
+          set_intersection(balls.begin(), balls.end(), current_shot_info.shot_obstructions.obstructing_object_balls.begin(), current_shot_info.shot_obstructions.obstructing_object_balls.end(),
+                            std::inserter(intersect_cue_ball_path, intersect_cue_ball_path.begin()));
+          if (intersect_cue_ball_path.size() > 0)
+          {
+            continue;
+          }
           for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
           {
             for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
@@ -1328,7 +1348,7 @@ string strength_to_string(unsigned char strength) {
 }
 
 string unsigned_char_coordinates_struct_to_string(unsigned_char_coordinates_struct coordinates) {
-  return "(" + to_string(coordinates.x) + ", " + to_string(coordinates.y) + ")";
+  return vector_to_string(Vector2d(coordinates.x, coordinates.y));
 }
 
 void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue_ball) {
@@ -1379,17 +1399,6 @@ void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue
 }
 
 /*
-std::ostream &operator<<(std::ostream &o, const obstructions &obstructions)
-{
-  o << "Permanent obstruction: " << obstructions.has_permanent_obstruction << endl;
-  o << "Object ball obstructions: " << endl;
-  for (unsigned char index : obstructions.obstructing_object_balls)
-  {
-    o << (int)index << " ";
-  }
-  return o;
-}
-
 std::ostream &operator<<(std::ostream &o, const shot_info_struct &shot_info)
 {
   o << shot_info.difficulty << endl;

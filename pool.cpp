@@ -40,6 +40,7 @@ int main()
   populate_ghost_ball_position_table();
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
+  cout << shot_info_table[6][6][0][0].shot_obstructions << endl;
   populate_shot_path_table();
   populate_selected_shot_table();
 
