@@ -482,7 +482,8 @@ obstructions_struct get_obstructions_on_segment_for_shot(
 
 /**
  * Populates the ball_to_pocket_obstructions_table. See variable comment.
- * Relies on initialize_pockets.
+ * This function relies on {@code opponent_object_balls}, {@code object_balls}, {@code eight_ball}, and {@code pockets} 
+ * being populated.
  */
 void populate_ball_to_pocket_obstructions_table()
 {
@@ -498,6 +499,9 @@ void populate_ball_to_pocket_obstructions_table()
   }
 }
 
+/**
+ * Calculates the ghost ball position for a given ball shot into a particular pocket.
+ */
 Vector2d get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &pocket)
 {
   Vector2d pocket_to_ball = ball - pocket;
@@ -505,7 +509,8 @@ Vector2d get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &pocket)
 }
 
 /**
- * Populates the ghost ball position table. Relies on initialize_pockets.
+ * Populates the ghost ball position table. 
+ * This function relies on {@code object_balls}, {@code eight_ball}, and {@code pockets} being populated.
  */
 void populate_ghost_ball_position_table()
 {
@@ -531,14 +536,16 @@ void insert_into_set(set<unsigned char> &set1, set<unsigned char> &set2)
   }
 }
 
-// TODO: Test.
-bool double_equals(double a, double b, double epsilon = 0.0001)
+/**
+ * Returns whether two doubles are equal to each other.
+ */
+bool double_equals(double a, double b, double epsilon = 0.001)
 {
   return std::abs(a - b) < epsilon;
 }
 
 /**
- * Gets the intersection of two line segments.
+ * Gets the intersection coordinate of two line segments.
  * Uses the method outlined here: https://www.topcoder.com/community/competitive-programming/tutorials/geometry-concepts-line-intersection-and-its-applications/
  */
 segment_intersection_struct get_intersection_of_line_segments(
@@ -556,9 +563,8 @@ segment_intersection_struct get_intersection_of_line_segments(
   double det = A1 * B2 - A2 * B1;
   segment_intersection_struct segment_intersection;
   segment_intersection.has_intersection = false;
-  if (det == 0)
+  if (double_equals(det, 0))
   {
-    cout << "HERE1" << endl;
     return segment_intersection;
   }
   double x = (B2 * C1 - B1 * C2) / det;
@@ -586,7 +592,7 @@ segment_intersection_struct get_intersection_of_line_segments(
 
 segment_intersection_struct get_intersection_of_line_segments(
     const Vector2d &segment1_start, const Vector2d &segment1_end,
-    const vector<Vector2d> &segment2)
+    const vector<Vector2d> &segment2) 
 {
   return get_intersection_of_line_segments(segment1_start, segment1_end, segment2[0], segment2[1]);
 }
