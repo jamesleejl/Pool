@@ -32,7 +32,6 @@ protected:
     object_balls.clear();
     opponent_object_balls.clear();
     eight_ball = Vector2d(0, 0);
-    cue_ball = Vector2d(0, 0);
     ball_to_pocket_obstructions_table.clear();
     ghost_ball_position_table.clear();
     shot_info_table.clear();
@@ -92,12 +91,12 @@ TEST_F(PoolTest, DistanceFromPointToSegment_withinSegmentInverted)
 
 TEST_F(PoolTest, DistanceFromPointToSegment_rightOfSegment)
 {
-  EXPECT_FLOAT_EQ(-1, distance_from_point_to_segment(Vector2d(2, 3), Vector2d(-5, 0), Vector2d(1, 0)));
+  EXPECT_FLOAT_EQ(std::numeric_limits<float>::infinity(), distance_from_point_to_segment(Vector2d(2, 3), Vector2d(-5, 0), Vector2d(1, 0)));
 }
 
 TEST_F(PoolTest, DistanceFromPointToSegment_leftOfSegment)
 {
-  EXPECT_FLOAT_EQ(-1, distance_from_point_to_segment(Vector2d(2, 3), Vector2d(4, 0), Vector2d(8, 0)));
+  EXPECT_FLOAT_EQ(std::numeric_limits<float>::infinity(), distance_from_point_to_segment(Vector2d(2, 3), Vector2d(4, 0), Vector2d(8, 0)));
 }
 
 TEST_F(PoolTest, DistanceFromPointToSegment_angledLine)
@@ -108,70 +107,70 @@ TEST_F(PoolTest, DistanceFromPointToSegment_angledLine)
 
 TEST_F(PoolTest, BallIntersectsSegment_intersectsMiddle)
 {
-  EXPECT_TRUE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), Vector2d(0, DIAMOND_LENGTH * 4), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+  EXPECT_TRUE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), Vector2d(0, UNITS_PER_DIAMOND * 4), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_intersectsTop)
 {
-  EXPECT_TRUE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4 + BALL_DIAMETER - 0.001), Vector2d(0, DIAMOND_LENGTH * 4), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+  EXPECT_TRUE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4 + BALL_DIAMETER - 0.001), Vector2d(0, UNITS_PER_DIAMOND * 4), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_intersectsBottom)
 {
-  EXPECT_TRUE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4 - BALL_DIAMETER + 0.001), Vector2d(0, DIAMOND_LENGTH * 4), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+  EXPECT_TRUE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4 - BALL_DIAMETER + 0.001), Vector2d(0, UNITS_PER_DIAMOND * 4), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_ballAbove)
 {
-  EXPECT_FALSE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4 + BALL_DIAMETER + 0.001), Vector2d(0, DIAMOND_LENGTH * 4), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+  EXPECT_FALSE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4 + BALL_DIAMETER + 0.001), Vector2d(0, UNITS_PER_DIAMOND * 4), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_ballBelow)
 {
-  EXPECT_FALSE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4 - BALL_DIAMETER - 0.001), Vector2d(0, DIAMOND_LENGTH * 4), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+  EXPECT_FALSE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4 - BALL_DIAMETER - 0.001), Vector2d(0, UNITS_PER_DIAMOND * 4), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_angledLine)
 {
-  EXPECT_TRUE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 4 / 3, DIAMOND_LENGTH * 4 / 3), Vector2d(0, 0)));
+  EXPECT_TRUE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 4 / 3, UNITS_PER_DIAMOND * 4 / 3), Vector2d(0, 0)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_angledLineMiss)
 {
-  EXPECT_FALSE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH + DIAMOND_LENGTH / 2), Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 2), Vector2d(0, 0)));
+  EXPECT_FALSE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND + UNITS_PER_DIAMOND / 2), Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2), Vector2d(0, 0)));
 }
 
 TEST_F(PoolTest, BallIntersectsSegment_fromCornerToMiddle)
 {
-  EXPECT_TRUE(ball_intersects_segment(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 6), Vector2d(0, DIAMOND_LENGTH * 8), Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4)));
+  EXPECT_TRUE(ball_intersects_segment(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 6), Vector2d(0, UNITS_PER_DIAMOND * 8), Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4)));
 }
 
 TEST_F(PoolTest, GetObstructionsOnSegmentForShot_unobstructed)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 2);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4));
-  obstructions shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4), false);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 2);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4));
+  obstructions_struct shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4), false);
   EXPECT_FALSE(shot_obstructions.has_permanent_obstruction);
   EXPECT_EQ(0, shot_obstructions.obstructing_object_balls.size());
 }
 
 TEST_F(PoolTest, GetObstructionsOnSegmentForShot_eight_ball_obstruction)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 3);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4));
-  obstructions shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4), false);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 3);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4));
+  obstructions_struct shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4), false);
   EXPECT_TRUE(shot_obstructions.has_permanent_obstruction);
   EXPECT_EQ(0, shot_obstructions.obstructing_object_balls.size());
 }
 
 TEST_F(PoolTest, GetObstructionsOnSegmentForShot_opponent_ball_obstruction)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 2);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 3));
-  obstructions shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4), false);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 2);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 3));
+  obstructions_struct shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4), false);
   EXPECT_TRUE(shot_obstructions.has_permanent_obstruction);
   EXPECT_EQ(0, shot_obstructions.obstructing_object_balls.size());
 }
@@ -179,23 +178,23 @@ TEST_F(PoolTest, GetObstructionsOnSegmentForShot_opponent_ball_obstruction)
 TEST_F(PoolTest, GetObstructionsOnSegmentForShot_pocket_obstruction)
 {
   initialize_pockets();
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 2);
-  obstructions shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 5, DIAMOND_LENGTH * 5), true);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 2);
+  obstructions_struct shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 5, UNITS_PER_DIAMOND * 5), true);
   EXPECT_TRUE(shot_obstructions.has_permanent_obstruction);
   EXPECT_EQ(0, shot_obstructions.obstructing_object_balls.size());
 }
 
 TEST_F(PoolTest, GetObstructionsOnSegmentForShot_object_ball_obstruction)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 2);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 2)); // Obstructing.
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2.5 + DIAMOND_LENGTH / 4, DIAMOND_LENGTH * 2.5)); // Obstructing.
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4));
-  obstructions shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH), Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4), false);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 2);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2)); // Obstructing.
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5 + UNITS_PER_DIAMOND / 4, UNITS_PER_DIAMOND * 2.5)); // Obstructing.
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4));
+  obstructions_struct shot_obstructions = get_obstructions_on_segment_for_shot(-1, Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND), Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4), false);
   EXPECT_FALSE(shot_obstructions.has_permanent_obstruction);
   EXPECT_EQ(2, shot_obstructions.obstructing_object_balls.size());
   EXPECT_TRUE(shot_obstructions.obstructing_object_balls.find(1) != shot_obstructions.obstructing_object_balls.end());
@@ -204,18 +203,18 @@ TEST_F(PoolTest, GetObstructionsOnSegmentForShot_object_ball_obstruction)
 
 TEST_F(PoolTest, PopulateBallToPocketObstructionsTable)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 6);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.5, DIAMOND_LENGTH * 7));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 2));
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 6);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 0.5, UNITS_PER_DIAMOND * 7));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 4));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 2));
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
-  for (unsigned char p = 0; p < 6; ++p)
+  for (unsigned short int p = 0; p < 6; ++p)
   {
-    for (unsigned char b = 0; b < object_balls.size(); ++b)
+    for (unsigned short int b = 0; b < object_balls.size(); ++b)
     {
       if ((b == 0 && p == 1) || (b == 0 && p == 3) || (b == 0 && p == 4) ||
           (b == 1 && p == 1) || (b == 2 && p == 3))
@@ -250,45 +249,45 @@ TEST_F(PoolTest, PopulateBallToPocketObstructionsTable)
 TEST_F(PoolTest, GetGhostBallForShot)
 {
   initialize_pockets();
-  expect_vector2d_equal(Vector2d(4.1609969, 8.3219938), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[0]));
-  expect_vector2d_equal(Vector2d(3.8390031, 8.3219938), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[1]));
-  expect_vector2d_equal(Vector2d(4.3600001, 8), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[2]));
-  expect_vector2d_equal(Vector2d(3.6399999, 8), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[3]));
-  expect_vector2d_equal(Vector2d(4.1609969, 7.6780062), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[4]));
-  expect_vector2d_equal(Vector2d(3.8390031, 7.6780062), get_ghost_ball_for_shot(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4), pockets[5]));
+  expect_vector2d_equal(Vector2d(4.1609969, 8.3219938), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[0]).coords);
+  expect_vector2d_equal(Vector2d(3.8390031, 8.3219938), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[1]).coords);
+  expect_vector2d_equal(Vector2d(4.3600001, 8), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[2]).coords);
+  expect_vector2d_equal(Vector2d(3.6399999, 8), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[3]).coords);
+  expect_vector2d_equal(Vector2d(4.1609969, 7.6780062), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[4]).coords);
+  expect_vector2d_equal(Vector2d(3.8390031, 7.6780062), get_ghost_ball_for_shot(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4), pockets[5]).coords);
 }
 
 TEST_F(PoolTest, PopulateGhostBallPositionTable)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
+  eight_ball = Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4));
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
-  for (unsigned char i = 0; i < 8; ++i)
+  for (unsigned short int i = 0; i < 8; ++i)
   {
     if (i >= 2 && i <= 7)
     {
       continue;
     }
-    expect_vector2d_equal(Vector2d(4.1609969, 8.3219938), ghost_ball_position_table[i][0]);
-    expect_vector2d_equal(Vector2d(3.8390031, 8.3219938), ghost_ball_position_table[i][1]);
-    expect_vector2d_equal(Vector2d(4.3600001, 8), ghost_ball_position_table[i][2]);
-    expect_vector2d_equal(Vector2d(3.6399999, 8), ghost_ball_position_table[i][3]);
-    expect_vector2d_equal(Vector2d(4.1609969, 7.6780062), ghost_ball_position_table[i][4]);
-    expect_vector2d_equal(Vector2d(3.8390031, 7.6780062), ghost_ball_position_table[i][5]);
+    expect_vector2d_equal(Vector2d(4.1609969, 8.3219938), ghost_ball_position_table[i][0].coords);
+    expect_vector2d_equal(Vector2d(3.8390031, 8.3219938), ghost_ball_position_table[i][1].coords);
+    expect_vector2d_equal(Vector2d(4.3600001, 8), ghost_ball_position_table[i][2].coords);
+    expect_vector2d_equal(Vector2d(3.6399999, 8), ghost_ball_position_table[i][3].coords);
+    expect_vector2d_equal(Vector2d(4.1609969, 7.6780062), ghost_ball_position_table[i][4].coords);
+    expect_vector2d_equal(Vector2d(3.8390031, 7.6780062), ghost_ball_position_table[i][5].coords);
   }
 }
 
 TEST_F(PoolTest, InsertIntoSet)
 {
-  set<unsigned char> set1;
+  set<unsigned short int> set1;
   set1.insert(1);
   set1.insert(2);
   set1.insert(3);
-  set<unsigned char> set2;
+  set<unsigned short int> set2;
   set2.insert(4);
   set2.insert(5);
   set2.insert(6);
@@ -300,10 +299,10 @@ TEST_F(PoolTest, InsertIntoSet)
 TEST_F(PoolTest, GetIntersectionOfLineSegments)
 {
   segment_intersection_struct segment_intersection = get_intersection_of_line_segments(
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4),
-      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4),
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 5));
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4),
+      Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 4),
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 5));
   EXPECT_TRUE(segment_intersection.has_intersection);
   expect_vector2d_equal(Vector2d(3, 8), segment_intersection.intersection_point);
 }
@@ -311,20 +310,20 @@ TEST_F(PoolTest, GetIntersectionOfLineSegments)
 TEST_F(PoolTest, GetIntersectionOfLineSegments_noIntersection)
 {
   segment_intersection_struct segment_intersection = get_intersection_of_line_segments(
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 3));
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 3));
   EXPECT_FALSE(segment_intersection.has_intersection);
 }
 
 TEST_F(PoolTest, GetIntersectionOfLineSegments_notOnSegments)
 {
   segment_intersection_struct segment_intersection = get_intersection_of_line_segments(
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 2),
-      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 2));
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2),
+      Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 2));
   EXPECT_FALSE(segment_intersection.has_intersection);
 }
 
@@ -333,8 +332,8 @@ TEST_F(PoolTest, GetIntersectionWithTableEdges)
   initialize_pockets();
   initialize_table_edges();
   segment_intersection_struct segment_intersection = get_intersection_of_line_segments(
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 7),
-      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 9),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 7),
+      Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 9),
       top_edge);
   EXPECT_TRUE(segment_intersection.has_intersection);
   expect_vector2d_equal(Vector2d(5, 16), segment_intersection.intersection_point);
@@ -352,9 +351,9 @@ TEST_F(PoolTest, GetSegmentRanges)
 TEST_F(PoolTest, GetTangentLine_perpendicularToRail)
 {
   shot_angle_struct shot_angle = get_shot_angle(
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4));
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+      Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4));
   EXPECT_EQ(shot_angle_struct::CLOCKWISE, shot_angle.follow_direction);
   expect_vector2d_equal(Vector2d(0, 1), shot_angle.tangent_line_direction);
   expect_vector2d_equal(Vector2d(4, 8), shot_angle.origin);
@@ -365,9 +364,9 @@ TEST_F(PoolTest, GetTangentLine_perpendicularToRail)
 TEST_F(PoolTest, GetTangentLine_perpendicularToRailOppositeDirection)
 {
   shot_angle_struct shot_angle = get_shot_angle(
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 5),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-      Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4));
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 5),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+      Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4));
   EXPECT_EQ(shot_angle_struct::COUNTER_CLOCKWISE, shot_angle.follow_direction);
   expect_vector2d_equal(Vector2d(0, -1), shot_angle.tangent_line_direction);
   expect_vector2d_equal(Vector2d(4, 8), shot_angle.origin);
@@ -378,8 +377,8 @@ TEST_F(PoolTest, GetTangentLine_perpendicularToRailOppositeDirection)
 TEST_F(PoolTest, GetTangentLine_45Degrees)
 {
   shot_angle_struct shot_angle = get_shot_angle(
-      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH),
+      Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND),
       Vector2d(0, 0));
   EXPECT_EQ(shot_angle_struct::COUNTER_CLOCKWISE, shot_angle.follow_direction);
   expect_vector2d_equal(Vector2d(-0.70710677, 0.70710677), shot_angle.tangent_line_direction);
@@ -392,11 +391,11 @@ TEST_F(PoolTest, ReflectBallPathOffTableEdges_rightEdge)
 {
   initialize_pockets();
   initialize_table_edges();
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
-      Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 6),
-      Vector2d(DIAMOND_LENGTH * 6, DIAMOND_LENGTH * 9),
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
+      Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 6),
+      Vector2d(UNITS_PER_DIAMOND * 6, UNITS_PER_DIAMOND * 9),
       8.48528137424);
-  EXPECT_TRUE(rail_reflection.has_intersection);
+  EXPECT_TRUE(rail_reflection.has_reflection);
   expect_vector2d_equal(Vector2d(8, 14), rail_reflection.intersection_point);
   expect_vector2d_equal(Vector2d(4, 18), rail_reflection.end_point);
 }
@@ -405,11 +404,11 @@ TEST_F(PoolTest, ReflectBallPathOffTableEdges_topEdge)
 {
   initialize_pockets();
   initialize_table_edges();
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 7),
-      Vector2d(DIAMOND_LENGTH * 5, DIAMOND_LENGTH * 10),
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 7),
+      Vector2d(UNITS_PER_DIAMOND * 5, UNITS_PER_DIAMOND * 10),
       8.48528137424);
-  EXPECT_TRUE(rail_reflection.has_intersection);
+  EXPECT_TRUE(rail_reflection.has_reflection);
   expect_vector2d_equal(Vector2d(6, 16), rail_reflection.intersection_point);
   expect_vector2d_equal(Vector2d(10, 12), rail_reflection.end_point);
 }
@@ -418,11 +417,11 @@ TEST_F(PoolTest, ReflectBallPathOffTableEdges_bottomEdge)
 {
   initialize_pockets();
   initialize_table_edges();
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * -10),
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * -10),
       22);
-  EXPECT_TRUE(rail_reflection.has_intersection);
+  EXPECT_TRUE(rail_reflection.has_reflection);
   expect_vector2d_equal(Vector2d(4, 0), rail_reflection.intersection_point);
   expect_vector2d_equal(Vector2d(4, 20), rail_reflection.end_point);
 }
@@ -431,11 +430,11 @@ TEST_F(PoolTest, ReflectBallPathOffTableEdges_leftEdge)
 {
   initialize_pockets();
   initialize_table_edges();
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH * -1, DIAMOND_LENGTH * 5),
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND * -1, UNITS_PER_DIAMOND * 5),
       10);
-  EXPECT_TRUE(rail_reflection.has_intersection);
+  EXPECT_TRUE(rail_reflection.has_reflection);
   expect_vector2d_equal(Vector2d(0, 7.3333335), rail_reflection.intersection_point);
   expect_vector2d_equal(Vector2d(2, 10), rail_reflection.end_point);
 }
@@ -444,17 +443,17 @@ TEST_F(PoolTest, ReflectBallPathOffTableEdges_noIntersection)
 {
   initialize_pockets();
   initialize_table_edges();
-  rail_reflection_struct rail_reflection = reflect_ball_path_off_table_edges(
-      Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH),
-      Vector2d(DIAMOND_LENGTH * 3.5, DIAMOND_LENGTH * 7.5),
+  single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
+      Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND),
+      Vector2d(UNITS_PER_DIAMOND * 3.5, UNITS_PER_DIAMOND * 7.5),
       13.3416640641);
-  EXPECT_FALSE(rail_reflection.has_intersection);
+  EXPECT_FALSE(rail_reflection.has_reflection);
 }
 
 TEST_F(PoolTest, StrengthToDistance)
 {
-  EXPECT_FLOAT_EQ(MAX_DIAMONDS * DIAMOND_LENGTH, strength_to_distance(NUM_STRENGTHS));
-  EXPECT_FLOAT_EQ(1.0 * MAX_DIAMONDS * DIAMOND_LENGTH / NUM_STRENGTHS, strength_to_distance(1));
+  EXPECT_FLOAT_EQ(MAX_DIAMONDS * UNITS_PER_DIAMOND, strength_to_distance(NUM_STRENGTHS));
+  EXPECT_FLOAT_EQ(1.98, strength_to_distance(1));
 }
 
 TEST_F(PoolTest, GetPath_parallelToLongRail)
@@ -464,7 +463,7 @@ TEST_F(PoolTest, GetPath_parallelToLongRail)
   shot_angle_struct shot_angle;
   shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
   shot_angle.tangent_line_direction = Vector2d(0, 1);
-  shot_angle.origin = Vector2d(DIAMOND_LENGTH, 0);
+  shot_angle.origin = Vector2d(UNITS_PER_DIAMOND, 0);
   shot_angle.pocket_direction = Vector2d(1, 0);
   shot_angle.fractional_distance = 1;
   vector<Vector2d> path = get_path(shot_angle, NUM_STRENGTHS, 0);
@@ -483,7 +482,7 @@ TEST_F(PoolTest, GetPath_doesNotIntersectRail)
   shot_angle_struct shot_angle;
   shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
   shot_angle.tangent_line_direction = Vector2d(0.707, 0.707);
-  shot_angle.origin = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH);
+  shot_angle.origin = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND);
   shot_angle.pocket_direction = Vector2d(-0.707, -0.707);
   shot_angle.fractional_distance = 0.1;
   vector<Vector2d> path = get_path(shot_angle, NUM_STRENGTHS, 0);
@@ -499,7 +498,7 @@ TEST_F(PoolTest, GetPath_intersectsRailAt45Degrees)
   shot_angle_struct shot_angle;
   shot_angle.follow_direction = shot_angle_struct::CLOCKWISE;
   shot_angle.tangent_line_direction = Vector2d(0.70710678118, 0.70710678118);
-  shot_angle.origin = Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH);
+  shot_angle.origin = Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND);
   shot_angle.pocket_direction = Vector2d(-0.70710678118, -0.70710678118);
   shot_angle.fractional_distance = 1;
   vector<Vector2d> path = get_path(shot_angle, NUM_STRENGTHS, 0);
@@ -517,22 +516,22 @@ TEST_F(PoolTest, GetPath_intersectsRailAt45Degrees)
 
 TEST_F(PoolTest, PopulateShotInfoTableObstructions)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 6);
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4));
-  object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 2));
-  opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4));
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 6);
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 2));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 4));
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
   populate_shot_info_table_obstructions();
-  for (unsigned char w = 0; w <= WIDTH; ++w)
+  for (unsigned short int w = 0; w <= WIDTH; ++w)
   {
-    for (unsigned char l = 0; l <= LENGTH; ++l)
+    for (unsigned short int l = 0; l <= LENGTH; ++l)
     {
-      for (unsigned char b = 0; b < object_balls.size() + 1; ++b)
+      for (unsigned short int b = 0; b < object_balls.size() + 1; ++b)
       {
-        for (unsigned char p = 0; p < 6; ++p)
+        for (unsigned short int p = 0; p < 6; ++p)
         {
           if (b == 0 && (p == 3 || p == 4))
           {
@@ -546,69 +545,74 @@ TEST_F(PoolTest, PopulateShotInfoTableObstructions)
 
 TEST_F(PoolTest, GetShotDifficulty_projectAngledShot)
 {
+  initialize_pockets();
   EXPECT_EQ(16,
             get_shot_difficulty(
-                Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 3),
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+                Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 3),
+                Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+                3));
 }
 
 TEST_F(PoolTest, GetShotDifficulty)
 {
+  initialize_pockets();
   EXPECT_EQ(8,
             get_shot_difficulty(
-                Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+                Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND * 4),
+                Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+                3));
 }
 
 TEST_F(PoolTest, GetShotDifficulty_impossible)
 {
+  initialize_pockets();
   EXPECT_EQ(std::numeric_limits<float>::infinity(),
             get_shot_difficulty(
-                Vector2d(DIAMOND_LENGTH * 3, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+                Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND * 4),
+                Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+                3));
 }
 
 TEST_F(PoolTest, GetShotDifficulty_onGhostBall)
 {
+  initialize_pockets();
   EXPECT_EQ(0,
             get_shot_difficulty(
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+                Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+                Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 4),
+                3));
 }
 
 TEST_F(PoolTest, GetShotDifficulty_impossibleNinetyDegrees)
 {
+  initialize_pockets();
   EXPECT_EQ(std::numeric_limits<float>::infinity(),
             get_shot_difficulty(
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 3),
-                Vector2d(DIAMOND_LENGTH * 2, DIAMOND_LENGTH * 4),
-                Vector2d(DIAMOND_LENGTH * 4, DIAMOND_LENGTH * 4)));
+                Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 2),
+                Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 3),
+                3));
 }
 
 TEST_F(PoolTest, PopulateShotInfoTableDifficulty)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH * 2 + BALL_DIAMETER, DIAMOND_LENGTH * 4);
+  eight_ball = Vector2d(UNITS_PER_DIAMOND * 2 + BALL_DIAMETER, UNITS_PER_DIAMOND * 4);
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
-  EXPECT_EQ(16, shot_info_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][3].difficulty);
+  EXPECT_EQ(16, shot_info_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][3].difficulty);
   EXPECT_EQ(
       std::numeric_limits<float>::infinity(),
-      shot_info_table[DIAMOND_LENGTH * 2.5][DIAMOND_LENGTH * 3][0][3].difficulty);
-  EXPECT_EQ(8, shot_info_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 4][0][3].difficulty);
+      shot_info_table[UNITS_PER_DIAMOND * 2.5][UNITS_PER_DIAMOND * 3][0][3].difficulty);
+  EXPECT_EQ(8, shot_info_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 4][0][3].difficulty);
 }
 
 TEST_F(PoolTest, PopulateShotPathTable)
 {
-  eight_ball = Vector2d(DIAMOND_LENGTH * 2 + BALL_DIAMETER, DIAMOND_LENGTH * 4);
-  opponent_object_balls.push_back(Vector2d(4 * DIAMOND_LENGTH, 3 * DIAMOND_LENGTH));
+  eight_ball = Vector2d(UNITS_PER_DIAMOND * 2 + BALL_DIAMETER, UNITS_PER_DIAMOND * 4);
+  opponent_object_balls.push_back(Vector2d(4 * UNITS_PER_DIAMOND, 3 * UNITS_PER_DIAMOND));
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
@@ -617,31 +621,30 @@ TEST_F(PoolTest, PopulateShotPathTable)
   populate_shot_info_table_difficulty();
   populate_shot_path_table();
 
-  shot_path &current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][0][10][2];
-  EXPECT_FALSE(current_shot_path.possible);
-  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][1][10][2];
-  EXPECT_FALSE(current_shot_path.possible);
-  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][2][10][2];
-  EXPECT_FALSE(current_shot_path.possible);
-  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][4][10][2];
-  EXPECT_FALSE(current_shot_path.possible);
-  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][3][10][2];
-  EXPECT_EQ(4, current_shot_path.path_segments.size());
+  shot_path_struct &current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][0][10][2];
+  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][1][10][2];
+  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][2][10][2];
+  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][4][10][2];
+  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
+  current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][3][10][2];
+  EXPECT_EQ(3, current_shot_path.path_segments.size());
   expect_vector2d_equal(Vector2d(4, 8), current_shot_path.path_segments[0]);
   expect_vector2d_equal(Vector2d(4, 16), current_shot_path.path_segments[1]);
-  expect_vector2d_equal(Vector2d(4, 0), current_shot_path.path_segments[2]);
-  expect_vector2d_equal(Vector2d(4, 0.99999619), current_shot_path.path_segments[3]);
-  expect_vector2d_equal(Vector2d(4, 0.99999619), current_shot_path.final_position);
+  expect_vector2d_equal(Vector2d(4, 2.0100021), current_shot_path.path_segments[2]);
+  expect_vector2d_equal(Vector2d(4, 2.0100021), current_shot_path.final_position);
   EXPECT_FALSE(current_shot_path.shot_obstructions.has_permanent_obstruction);
-  EXPECT_TRUE(current_shot_path.possible);
-  current_shot_path = shot_path_table[DIAMOND_LENGTH][DIAMOND_LENGTH * 3][0][5][10][2];
+  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
+  current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][5][10][2];
   EXPECT_EQ(3, current_shot_path.path_segments.size());
   expect_vector2d_equal(Vector2d(4.2109075, 7.6723242), current_shot_path.path_segments[0]);
   expect_vector2d_equal(Vector2d(8, 5.9482875), current_shot_path.path_segments[1]);
-  expect_vector2d_equal(Vector2d(1.4733558, 2.9786642), current_shot_path.path_segments[2]);
-  expect_vector2d_equal(Vector2d(1.4733558, 2.9786642), current_shot_path.final_position);
-  EXPECT_TRUE(current_shot_path.shot_obstructions.has_permanent_obstruction);
-  EXPECT_TRUE(current_shot_path.possible);
+  expect_vector2d_equal(Vector2d(2.7153702, 3.5437806), current_shot_path.path_segments[2]);
+  expect_vector2d_equal(Vector2d(2.7153702, 3.5437806), current_shot_path.final_position);
+  EXPECT_FALSE(current_shot_path.shot_obstructions.has_permanent_obstruction);
+  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
 }
 
 } // namespace

@@ -6,10 +6,12 @@
 #include <chrono>
 #include <ctime>
 #include <string>
-
+#include <fstream>
+#include "./json.hpp"
 #include "Eigen/Dense"
 using namespace Eigen;
 using namespace std;
+using json = nlohmann::json;
 
 // TODO: Extend this to python: https://docs.python.org/3/extending/building.html
 // TODO: Handle bank shots.
@@ -29,7 +31,7 @@ struct obstructions_struct
    * Obstructing object balls belonging to the player are listed here.
    * Only accurately populated if has_permanent_obstruction is false.
    */
-  set<unsigned char> obstructing_object_balls;
+  set<unsigned short int> obstructing_object_balls;
 };
 
 /**
@@ -71,18 +73,18 @@ struct segment_range_struct
 };
 
 /**
- * Holds coordinate information in unsigned chars.
+ * Holds coordinate information in unsigned short ints.
  */
-struct unsigned_char_coordinates_struct
+struct unsigned_short_int_coordinates_struct
 {
   /**
    * The x coordinate.
    */
-  unsigned char x;
+  unsigned short int x;
   /**
    * The y coordinate.
    */
-  unsigned char y;
+  unsigned short int y;
 };
 
 /**
@@ -112,7 +114,7 @@ struct ball_in_hand_solution_struct
   /**
    * The coordinates.
    */
-  unsigned_char_coordinates_struct coordinates;
+  unsigned_short_int_coordinates_struct coordinates;
 };
 
 /**
@@ -184,6 +186,8 @@ struct shot_angle_struct
   Vector2d pocket_direction;
   // The proportion of the initial cue ball distance that the cue ball will travel at after contact.
   float fractional_distance;
+  // The cue angle of the shot.
+  float cut_angle_in_radians;
 };
 
 /**
@@ -226,22 +230,22 @@ struct selected_shot_struct
    * The strength of the shot. (0..NUM_STRENGTHS)
    * Only populated if possible is true.
    */
-  unsigned char strength;
+  unsigned short int strength;
   /**
    * The spin of the shot. (0..NUM_SPINS)
    * Only populated if possible is true.
    */
-  unsigned char spin;
+  unsigned short int spin;
   /**
    * The index of the object ball to shoot. The eight ball is at object_balls.size().
    * Only populated if possible is true.
    */
-  unsigned char object_ball;
+  unsigned short int object_ball;
   /**
    * Which pocket index to shoot the ball into.
    * Only populated if possible is true.
    */
-  unsigned char pocket;
+  unsigned short int pocket;
   /**
    * The total weighted difficulty of the runout starting from this ball.
    * Only populated if possible is true.
@@ -256,17 +260,17 @@ struct selected_shot_struct
    * The next x-coordinate of the cue ball after this shot.
    * Only populated if possible is true.
    */
-  unsigned char next_x;
+  unsigned short int next_x;
   /**
    * The next y-coordinate of the cue ball after this shot.
    * Only populated if possible is true.
    */
-  unsigned char next_y;
+  unsigned short int next_y;
   /**
    * The combination of object balls for the next shot, if any.
    * Only populated if possible is true.
    */
-  unsigned char next_combo;
+  unsigned short int next_combo;
 };
 
 /**
@@ -282,12 +286,12 @@ struct solution_struct
    * The starting x-coordinate of the cue ball. Only applicable if this is ball in hand.
    * Only populated if possible is true.
    */
-  unsigned char cue_ball_x;
+  unsigned short int cue_ball_x;
   /**
    * The starting y-coordinate of the cue ball. Only applicable if this is ball in hand.
    * Only populated if possible is true.
    */
-  unsigned char cue_ball_y;
+  unsigned short int cue_ball_y;
   /**
    * The list of selected_shot_structs representing the shots taken.
    * Only populated if possible is true.
@@ -301,17 +305,22 @@ struct solution_struct
 };
 
 /**
+ * The name of the file to output game data.
+ */
+const string GAME_DATA_FILE = "game_data.js";
+
+/**
  * The length of a diamond in units.
  */
-const unsigned char UNITS_PER_DIAMOND = 2;
+const unsigned short int UNITS_PER_DIAMOND = 2;
 /**
  * The number of shot strengths to consider. If this is not 12, strength_to_distance must be changed.
  */
-const unsigned char NUM_STRENGTHS = 12;
+const unsigned short int NUM_STRENGTHS = 12;
 /**
  * The number of shot spins to consider.
  */
-const unsigned char NUM_SPINS = 5;
+const unsigned short int NUM_SPINS = 5;
 /**
  * The maximum difficulty of individual shot to consider shooting.
  */
@@ -323,15 +332,15 @@ const float BALL_DIAMETER = 0.18 * UNITS_PER_DIAMOND;
 /**
  * The width of the pool table in units.
  */
-const unsigned char WIDTH = UNITS_PER_DIAMOND * 4;
+const unsigned short int WIDTH = UNITS_PER_DIAMOND * 4;
 /**
  * The length of the pool table in units.
  */
-const unsigned char LENGTH = WIDTH * 2;
+const unsigned short int LENGTH = WIDTH * 2;
 /**
  * The maximum number of diamonds the cue ball can travel if untouched by an object ball.
  */
-const unsigned char MAX_DIAMONDS = 30;
+const unsigned short int MAX_DIAMONDS = 30;
 /**
  * The positions of the pockets.
  */
@@ -409,7 +418,7 @@ std::ostream &operator<<(std::ostream &o, const obstructions_struct &obstruction
 {
   o << "Permanent obstruction: " << obstructions.has_permanent_obstruction << endl;
   o << "Object ball obstructions: " << endl;
-  for (unsigned char index : obstructions.obstructing_object_balls)
+  for (unsigned short int index : obstructions.obstructing_object_balls)
   {
     o << (int)index << " ";
   }
@@ -556,7 +565,7 @@ bool ball_intersects_segment(const Vector2d &ball, const Vector2d &segment_start
 /**
  * Gets the index of the eight ball.
  */
-unsigned char eight_ball_index() {
+unsigned short int eight_ball_index() {
   return object_balls.size();
 }
 
@@ -576,10 +585,10 @@ unsigned char eight_ball_index() {
  * TODO: Note which obstructions can be hit softly without consequences.
  */
 obstructions_struct get_obstructions_on_segment_for_shot(
-  unsigned char object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool is_cue_ball_path)
+  unsigned short int object_ball_index, const Vector2d &segment_start, const Vector2d &segment_end, bool is_cue_ball_path)
 {
   obstructions_struct obstructions;
-  for (unsigned char o = 0; o < opponent_object_balls.size(); ++o)
+  for (unsigned short int o = 0; o < opponent_object_balls.size(); ++o)
   {
     if (ball_intersects_segment(opponent_object_balls[o], segment_start, segment_end))
     {
@@ -593,7 +602,7 @@ obstructions_struct get_obstructions_on_segment_for_shot(
   }
   if (is_cue_ball_path)
   {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
+    for (unsigned short int p = 0; p < pockets.size(); ++p)
     {
       if (ball_intersects_segment(pockets[p], segment_start, segment_end))
       {
@@ -611,7 +620,7 @@ obstructions_struct get_obstructions_on_segment_for_shot(
     obstructions.has_permanent_obstruction = true;
     return obstructions;
   }
-  for (unsigned char i = 0; i < object_balls.size(); ++i)
+  for (unsigned short int i = 0; i < object_balls.size(); ++i)
   {
     if (i == object_ball_index)
     {
@@ -633,10 +642,10 @@ obstructions_struct get_obstructions_on_segment_for_shot(
 void populate_ball_to_pocket_obstructions_table()
 {
   ball_to_pocket_obstructions_table = vector<vector<obstructions_struct>>(object_balls.size() + 1, vector<obstructions_struct>(pockets.size()));
-  for (unsigned char p = 0; p < pockets.size(); ++p)
+  for (unsigned short int p = 0; p < pockets.size(); ++p)
   {
     Vector2d pocket = pockets[p];
-    for (unsigned char o = 0; o < object_balls.size(); ++o)
+    for (unsigned short int o = 0; o < object_balls.size(); ++o)
     {
       ball_to_pocket_obstructions_table[o][p] = get_obstructions_on_segment_for_shot(o, object_balls[o], pocket, false);
     }
@@ -670,9 +679,9 @@ ghost_ball_struct get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &
 void populate_ghost_ball_position_table()
 {
   ghost_ball_position_table = vector<vector<ghost_ball_struct>>(object_balls.size() + 1, vector<ghost_ball_struct>(pockets.size()));
-  for (unsigned char p = 0; p < pockets.size(); ++p)
+  for (unsigned short int p = 0; p < pockets.size(); ++p)
   {
-    for (unsigned char o = 0; o < object_balls.size(); ++o)
+    for (unsigned short int o = 0; o < object_balls.size(); ++o)
     {
       ghost_ball_position_table[o][p] = get_ghost_ball_for_shot(object_balls[o], pockets[p]);
     }
@@ -684,9 +693,9 @@ void populate_ghost_ball_position_table()
 /**
  * Modifies set 1 by adding all the elements from set 2.
  */
-void insert_into_set(set<unsigned char> &set1, set<unsigned char> &set2)
+void insert_into_set(set<unsigned short int> &set1, set<unsigned short int> &set2)
 {
-  for (unsigned char index : set2)
+  for (unsigned short int index : set2)
   {
     set1.insert(index);
   }
@@ -699,17 +708,17 @@ void insert_into_set(set<unsigned char> &set1, set<unsigned char> &set2)
 void populate_shot_info_table_obstructions()
 {
   shot_info_table = vector<vector<vector<vector<shot_info_struct>>>>(WIDTH + 1, vector<vector<vector<shot_info_struct>>>(LENGTH + 1, vector<vector<shot_info_struct>>(object_balls.size() + 1, vector<shot_info_struct>(pockets.size()))));
-  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+  for (unsigned short int o = 0; o < object_balls.size() + 1; ++o)
   {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
+    for (unsigned short int p = 0; p < pockets.size(); ++p)
     {
       // Might need to be careful in this copy of a struct, but it works right now.
-      // The set<unsigned char> appears to be copied by value, not reference.
+      // The set<unsigned short int> appears to be copied by value, not reference.
       obstructions_struct ball_to_pocket_obstructions = ball_to_pocket_obstructions_table[o][p];
       ghost_ball_struct ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w <= WIDTH; ++w)
+      for (unsigned short int w = 0; w <= WIDTH; ++w)
       {
-        for (unsigned char l = 0; l <= LENGTH; ++l)
+        for (unsigned short int l = 0; l <= LENGTH; ++l)
         {
           shot_info_struct &shot_info = shot_info_table[w][l][o][p];
           if (!ghost_ball_position.possible) {
@@ -741,7 +750,7 @@ void populate_shot_info_table_obstructions()
  * Expects pockets to be in a particular order. (bottom left, bottom right, left, right, upper left, upper right).
  * TODO: Write unit test.
  */
-Vector2d get_vector_from_center_of_pocket(unsigned char pocket_index) {
+Vector2d get_vector_from_center_of_pocket(unsigned short int pocket_index) {
   switch(pocket_index) {
     case 0:
       return Vector2d(1, 1);
@@ -769,7 +778,7 @@ Vector2d get_vector_from_center_of_pocket(unsigned char pocket_index) {
  * TODO: Break out difficulty scaling factor into its own function.
  * If impossible, it returns inf.
  */
-float get_shot_difficulty(const Vector2d &cue_ball, const Vector2d &ghost_ball, unsigned char pocket_index)
+float get_shot_difficulty(const Vector2d &cue_ball, const Vector2d &ghost_ball, unsigned short int pocket_index)
 {
   Vector2d vector_from_center_of_pocket = get_vector_from_center_of_pocket(pocket_index);
   if (cue_ball == ghost_ball)
@@ -801,14 +810,14 @@ float get_shot_difficulty(const Vector2d &cue_ball, const Vector2d &ghost_ball, 
  */
 void populate_shot_info_table_difficulty()
 {
-  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+  for (unsigned short int o = 0; o < object_balls.size() + 1; ++o)
   {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
+    for (unsigned short int p = 0; p < pockets.size(); ++p)
     {
       const ghost_ball_struct &ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w <= WIDTH; ++w)
+      for (unsigned short int w = 0; w <= WIDTH; ++w)
       {
-        for (unsigned char l = 0; l <= LENGTH; ++l)
+        for (unsigned short int l = 0; l <= LENGTH; ++l)
         {
           shot_info_struct &shot_info = shot_info_table[w][l][o][p];
           if (!ghost_ball_position.possible) {
@@ -966,9 +975,9 @@ single_rail_reflection_struct reflect_ball_path_off_single_table_edge(
  * TODO: Scale the strength to the distance non linearly.
  * TODO: Unit test.
  */
-float strength_to_distance(unsigned char strength)
+float strength_to_distance(unsigned short int strength)
 {
-  float multiplier = 0;
+  float multiplier = 1;
   switch (strength) {
     case 0:
       return 0;
@@ -1011,6 +1020,12 @@ float strength_to_distance(unsigned char strength)
 
 /**
  * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
+ * TODO: Add this code.
+  Vector2d initial = Vector2d(3, 4);
+  Vector2d cue_ball_path = shot_angle.origin - initial;
+  float angle = acos(shot_angle.pocket_direction.dot(cue_ball_path) / (cue_ball_path.norm() * shot_angle.pocket_direction.norm()));
+  float draw_angle = 180 - atan(sin(angle)*sin(angle) - sin(angle)*cos(angle)/ 4);
+  angle += draw_angle;
  */
 shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost_ball, const Vector2d &pocket)
 {
@@ -1033,6 +1048,7 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
   }
   double dot = ghost_ball_to_cue_ball.dot(ghost_ball_to_pocket);
   float negative_cos_theta = dot / (ghost_ball_to_cue_ball.norm() * ghost_ball_to_pocket.norm());
+  shot_angle.cut_angle_in_radians = acos(-1 * negative_cos_theta);
   shot_angle.fractional_distance = 1 - negative_cos_theta * negative_cos_theta;
   return shot_angle;
 }
@@ -1043,7 +1059,7 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
  * TODO: Break this up into multiple functions.
  * TODO: This is just a hack right now. Does not take spin into account.
  */
-vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, unsigned char spin)
+vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned short int strength, unsigned short int spin)
 {
   vector<Vector2d> ret;
   float distance_to_travel = shot_angle.fractional_distance * strength_to_distance(strength);
@@ -1054,7 +1070,10 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
       cue_ball_location, cue_ball_destination, distance_to_travel);
   while (rail_reflection.has_reflection)
   {
-    ret.push_back(rail_reflection.intersection_point);
+    if (!double_equals(rail_reflection.intersection_point.x(), cue_ball_location.x()) ||
+      !double_equals(rail_reflection.intersection_point.y(), cue_ball_location.y())) {
+      ret.push_back(rail_reflection.intersection_point);
+    }
     cue_ball_location = rail_reflection.intersection_point;
     cue_ball_destination = rail_reflection.end_point;
     distance_to_travel = rail_reflection.distance_traveled_after_rail;
@@ -1076,19 +1095,19 @@ vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned char strength, 
 void populate_shot_path_table()
 {
   shot_path_table = vector<vector<vector<vector<vector<vector<shot_path_struct>>>>>>(WIDTH + 1, vector<vector<vector<vector<vector<shot_path_struct>>>>>(LENGTH + 1, vector<vector<vector<vector<shot_path_struct>>>>(object_balls.size() + 1, vector<vector<vector<shot_path_struct>>>(pockets.size(), vector<vector<shot_path_struct>>(NUM_STRENGTHS, vector<shot_path_struct>(NUM_SPINS))))));
-  for (unsigned char o = 0; o < object_balls.size() + 1; ++o)
+  for (unsigned short int o = 0; o < object_balls.size() + 1; ++o)
   {
-    for (unsigned char p = 0; p < pockets.size(); ++p)
+    for (unsigned short int p = 0; p < pockets.size(); ++p)
     {
       const ghost_ball_struct &ghost_ball_position = ghost_ball_position_table[o][p];
-      for (unsigned char w = 0; w <= WIDTH; ++w)
+      for (unsigned short int w = 0; w <= WIDTH; ++w)
       {
-        for (unsigned char l = 0; l <= LENGTH; ++l)
+        for (unsigned short int l = 0; l <= LENGTH; ++l)
         {
           shot_angle_struct shot_angle = get_shot_angle(Vector2d(w, l), ghost_ball_position.coords, pockets[p]);
-          for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
+          for (unsigned short int st = 0; st < NUM_STRENGTHS; ++st)
           {
-            for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
+            for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
             {
               shot_path_struct &current_shot_path = shot_path_table[w][l][o][p][st][sp];
               current_shot_path.within_acceptable_difficulty = false;
@@ -1101,7 +1120,7 @@ void populate_shot_path_table()
               vector<Vector2d> path = get_path(shot_angle, st, sp);
               current_shot_path.path_segments = path;
               current_shot_path.final_position = path[path.size() - 1];
-              for (unsigned char pa = 0; pa < path.size() - 1; ++pa)
+              for (unsigned short int pa = 0; pa < path.size() - 1; ++pa)
               {
                 obstructions_struct obstructions_on_segment = get_obstructions_on_segment_for_shot(o, path[pa], path[pa + 1], true);
                 if (obstructions_on_segment.has_permanent_obstruction)
@@ -1122,21 +1141,21 @@ void populate_shot_path_table()
 
 void populate_eight_ball_in_selected_shot_table()
 {
-  for (unsigned char w = 0; w <= WIDTH; ++w)
+  for (unsigned short int w = 0; w <= WIDTH; ++w)
   {
-    for (unsigned char l = 0; l <= LENGTH; ++l)
+    for (unsigned short int l = 0; l <= LENGTH; ++l)
     {
       selected_shot_struct &selected_shot = selected_shot_table[w][l][0];
-      for (unsigned char p = 0; p < pockets.size(); ++p)
+      for (unsigned short int p = 0; p < pockets.size(); ++p)
       {
         shot_info_struct &current_shot_info = shot_info_table[w][l][eight_ball_index()][p];
         if (current_shot_info.shot_obstructions.has_permanent_obstruction || current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER ||
             current_shot_info.weighted_difficulty > selected_shot.total_weighted_difficulty) {
               continue;
         }
-        for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
+        for (unsigned short int st = 0; st < NUM_STRENGTHS; ++st)
         {
-          for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
+          for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
           {
             shot_path_struct &current_shot_path = shot_path_table[w][l][eight_ball_index()][p][st][sp];
             if (current_shot_path.within_acceptable_difficulty &&
@@ -1156,16 +1175,16 @@ void populate_eight_ball_in_selected_shot_table()
   }
 }
 
-void populate_single_combination_in_selected_shot_table(int combo, set<unsigned char> &balls)
+void populate_single_combination_in_selected_shot_table(int combo, set<unsigned short int> &balls)
 {
   for (auto ball : balls)
   {
-    for (unsigned char w = 0; w <= WIDTH; ++w)
+    for (unsigned short int w = 0; w <= WIDTH; ++w)
     {
-      for (unsigned char l = 0; l <= LENGTH; ++l)
+      for (unsigned short int l = 0; l <= LENGTH; ++l)
       {
         selected_shot_struct &selected_shot = selected_shot_table[w][l][combo];
-        for (unsigned char p = 0; p < pockets.size(); ++p)
+        for (unsigned short int p = 0; p < pockets.size(); ++p)
         {
           shot_info_struct &current_shot_info = shot_info_table[w][l][ball][p];
           if (current_shot_info.shot_obstructions.has_permanent_obstruction || current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER ||
@@ -1173,23 +1192,23 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
           {
             continue;
           }
-          set<unsigned char> intersect_cue_ball_path;
+          set<unsigned short int> intersect_cue_ball_path;
           set_intersection(balls.begin(), balls.end(), current_shot_info.shot_obstructions.obstructing_object_balls.begin(), current_shot_info.shot_obstructions.obstructing_object_balls.end(),
                             std::inserter(intersect_cue_ball_path, intersect_cue_ball_path.begin()));
           if (intersect_cue_ball_path.size() > 0)
           {
             continue;
           }
-          for (unsigned char st = 0; st < NUM_STRENGTHS; ++st)
+          for (unsigned short int st = 0; st < NUM_STRENGTHS; ++st)
           {
-            for (unsigned char sp = 0; sp < NUM_SPINS; ++sp)
+            for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
             {
               shot_path_struct &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
               if (!current_shot_path.within_acceptable_difficulty || current_shot_path.shot_obstructions.has_permanent_obstruction)
               {
                 continue;
               }
-              set<unsigned char> intersect;
+              set<unsigned short int> intersect;
               set_intersection(balls.begin(), balls.end(), current_shot_path.shot_obstructions.obstructing_object_balls.begin(), current_shot_path.shot_obstructions.obstructing_object_balls.end(),
                                 std::inserter(intersect, intersect.begin()));
               if (intersect.size() > 0)
@@ -1197,8 +1216,8 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
                 continue;
               }
               int next_combo = combo - (1 << ball);
-              unsigned char rounded_x = (unsigned char)(0.5 + current_shot_path.final_position.x());
-              unsigned char rounded_y = (unsigned char)(0.5 + current_shot_path.final_position.y());
+              unsigned short int rounded_x = (unsigned short int)(0.5 + current_shot_path.final_position.x());
+              unsigned short int rounded_y = (unsigned short int)(0.5 + current_shot_path.final_position.y());
               if (!selected_shot_table[rounded_x][rounded_y][next_combo].possible) {
                 continue;
               }
@@ -1230,7 +1249,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
  */
 void process_object_ball_combination(int num_object_balls, int combo)
 {
-  set<unsigned char> balls;
+  set<unsigned short int> balls;
   for (int i = 0; i < num_object_balls; ++i)
   {
     if ((combo >> i) & 1)
@@ -1266,18 +1285,18 @@ void populate_selected_shot_table()
 {
   selected_shot_table = vector<vector<vector<selected_shot_struct>>>(WIDTH + 1, vector<vector<selected_shot_struct>>(LENGTH + 1, vector<selected_shot_struct>((int) pow(2, object_balls.size()))));
   populate_eight_ball_in_selected_shot_table();
-  for (unsigned char i = 1; i <= object_balls.size(); ++i)
+  for (unsigned short int i = 1; i <= object_balls.size(); ++i)
   {
     process_object_ball_combinations(object_balls.size(), i);
   }
 }
 
 const ball_in_hand_solution_struct find_ball_in_hand_solution() {
-  unsigned char max_object_ball_index = (unsigned char) pow(2, object_balls.size()) - 1;
+  unsigned short int max_object_ball_index = (unsigned short int) pow(2, object_balls.size()) - 1;
   ball_in_hand_solution_struct ball_in_hand_solution;
   float minimum_difficulty = std::numeric_limits<float>::infinity();
-  for (unsigned char w = 0; w <= WIDTH; ++w) {
-    for (unsigned char l = 0; l <= LENGTH; ++l) {
+  for (unsigned short int w = 0; w <= WIDTH; ++w) {
+    for (unsigned short int l = 0; l <= LENGTH; ++l) {
       if (selected_shot_table[w][l][max_object_ball_index].total_weighted_difficulty < minimum_difficulty) {
         ball_in_hand_solution.possible = true;
         ball_in_hand_solution.coordinates.x = w;
@@ -1289,11 +1308,11 @@ const ball_in_hand_solution_struct find_ball_in_hand_solution() {
   return ball_in_hand_solution;
 }
 
-string zero_based_index_to_one_based_index_string(unsigned char index) {
+string zero_based_index_to_one_based_index_string(unsigned short int index) {
   return to_string(index + 1);
 }
 
-string object_ball_index_to_string(unsigned char index) {
+string object_ball_index_to_string(unsigned short int index) {
   Vector2d object_ball;
   string ret = "";
   if (index == object_balls.size()) {
@@ -1307,7 +1326,7 @@ string object_ball_index_to_string(unsigned char index) {
   return ret;
 }
 
-string pocket_to_string(unsigned char pocket_index) {
+string pocket_to_string(unsigned short int pocket_index) {
   switch (pocket_index) {
     case 0:
       return "bottom left";
@@ -1326,7 +1345,7 @@ string pocket_to_string(unsigned char pocket_index) {
 }
 
 // TODO: This hacks everything to a spin of stun.
-string spin_to_string(unsigned char spin_index) {
+string spin_to_string(unsigned short int spin_index) {
   return "stun";
   switch (spin_index) {
     case 0:
@@ -1343,32 +1362,32 @@ string spin_to_string(unsigned char spin_index) {
   return "";
 }
 
-string strength_to_string(unsigned char strength) {
+string strength_to_string(unsigned short int strength) {
   return to_string(strength + 1) + " - " + to_string((int) round(strength_to_distance(strength) / (MAX_DIAMONDS * UNITS_PER_DIAMOND) * 100)) + "%";
 }
 
-string unsigned_char_coordinates_struct_to_string(unsigned_char_coordinates_struct coordinates) {
+string unsigned_short_int_coordinates_struct_to_string(unsigned_short_int_coordinates_struct coordinates) {
   return vector_to_string(Vector2d(coordinates.x, coordinates.y));
 }
 
-void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue_ball) {
-  unsigned char combo = (unsigned char) pow(2, object_balls.size()) - 1;
+void display_solution(bool is_ball_in_hand, unsigned_short_int_coordinates_struct cue_ball) {
+  unsigned short int combo = (unsigned short int) pow(2, object_balls.size()) - 1;
 
-  unsigned_char_coordinates_struct coords = cue_ball;
-  unsigned char shot_number = 1;
+  unsigned_short_int_coordinates_struct coords = cue_ball;
+  unsigned short int shot_number = 1;
   cout << endl;
   cout << "Table layout: " << endl;
   cout << "-------------" << endl;
   cout << "Ball in hand: " << (is_ball_in_hand ? "True" : "False") << endl;
-  cout << "Cue ball: " << unsigned_char_coordinates_struct_to_string(cue_ball) << endl;
+  cout << "Cue ball: " << unsigned_short_int_coordinates_struct_to_string(cue_ball) << endl;
   cout << "Eight ball: " << vector_to_string(eight_ball) << endl;
   cout << "Object balls: ";
-  for (unsigned char o = 0; o < object_balls.size(); ++o) {
+  for (unsigned short int o = 0; o < object_balls.size(); ++o) {
     cout << vector_to_string(object_balls[o]) << " ";
   }
   cout << endl;
   cout << "Opponent balls: ";
-  for (unsigned char o = 0; o < opponent_object_balls.size(); ++o) {
+  for (unsigned short int o = 0; o < opponent_object_balls.size(); ++o) {
     cout << vector_to_string(opponent_object_balls[o]) << " ";
   }
   cout << endl;
@@ -1380,7 +1399,7 @@ void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue
     }
     cout << "\nShot " << (int) shot_number << ":\n";
     cout << "-------\n";
-    cout << "Cue ball position: " + unsigned_char_coordinates_struct_to_string(coords) + "\n";
+    cout << "Cue ball position: " + unsigned_short_int_coordinates_struct_to_string(coords) + "\n";
     cout << "Object ball target: " << object_ball_index_to_string(selected_shot.object_ball) << endl;
     cout << "Pocket: " << pocket_to_string(selected_shot.pocket) << endl;
     cout << "Difficulty from this shot onwards: " << selected_shot.total_weighted_difficulty << endl;
@@ -1398,6 +1417,67 @@ void display_solution(bool is_ball_in_hand, unsigned_char_coordinates_struct cue
   cout << "Done" << endl;
 }
 
+void write_to_file(string json) {
+  ofstream myfile;
+  myfile.open (GAME_DATA_FILE);
+  myfile << "game_data = " << json << "\n";
+  myfile.close();
+}
+
+string get_json_for_solution(bool is_ball_in_hand, unsigned_short_int_coordinates_struct cue_ball) {
+  json game_data;
+
+  unsigned short int combo = (unsigned short int) pow(2, object_balls.size()) - 1;
+
+  unsigned_short_int_coordinates_struct coords = cue_ball;
+  unsigned short int shot_number = 1;
+
+  game_data["units_per_diamond"] = UNITS_PER_DIAMOND;
+  game_data["ball_in_hand"] = is_ball_in_hand;
+  game_data["cue_ball"] = {cue_ball.x, cue_ball.y};
+  game_data["eight_ball"] = {eight_ball.x(), eight_ball.y()};
+  game_data["object_balls"] = {};
+  game_data["turns"] = {};
+  game_data["has_solution"] = false;
+  for (unsigned short int o = 0; o < object_balls.size(); ++o) {
+    game_data["object_balls"].push_back({object_balls[o].x(), object_balls[o].y()});
+  }
+  game_data["opponent_object_balls"] = {};
+  for (unsigned short int o = 0; o < opponent_object_balls.size(); ++o) {
+    game_data["opponent_object_balls"].push_back({opponent_object_balls[o].x(), opponent_object_balls[o].y()});
+  }
+  do {
+    selected_shot_struct selected_shot = selected_shot_table[coords.x][coords.y][combo];
+
+    if (!selected_shot.possible) {
+      return game_data.dump();
+    }
+    game_data["has_solution"] = true;
+    json turn;
+    turn["shot_number"] = shot_number;
+    turn["cue_ball"] = {coords.x, coords.y};
+    turn["object_ball_index"] = selected_shot.object_ball;
+    turn["pocket_index"] = selected_shot.pocket;
+    turn["runout_difficulty"] = selected_shot.total_weighted_difficulty;
+    turn["strength"] = selected_shot.strength;
+    turn["spin"] = selected_shot.spin;
+
+    json path;
+    for (unsigned short int i = 0; i < selected_shot.path_segments.size(); ++i) {
+      path.push_back({selected_shot.path_segments[i].x(), selected_shot.path_segments[i].y()});
+    }
+    turn["path"] = path;
+    game_data["turns"].push_back(turn);
+    if (combo == 0) {
+      break;
+    }
+    coords.x = selected_shot.next_x;
+    coords.y = selected_shot.next_y;
+    combo = selected_shot.next_combo;
+    shot_number += 1;
+  } while(true);
+  return game_data.dump();
+}
 /*
 std::ostream &operator<<(std::ostream &o, const shot_info_struct &shot_info)
 {

@@ -11,12 +11,11 @@ using namespace std;
 
 int main()
 {
-  cout << endl;
   auto start = std::chrono::system_clock::now();
 
   bool get_ball_in_hand_solution = false;
   eight_ball = Vector2d(UNITS_PER_DIAMOND, 12);
-  unsigned_char_coordinates_struct cue_ball;
+  unsigned_short_int_coordinates_struct cue_ball;
   cue_ball.x = 7;
   cue_ball.y = 10;
   object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND));
@@ -40,7 +39,6 @@ int main()
   populate_ghost_ball_position_table();
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
-  cout << shot_info_table[6][6][0][0].shot_obstructions << endl;
   populate_shot_path_table();
   populate_selected_shot_table();
 
@@ -50,9 +48,11 @@ int main()
       cout << "No solution" << endl;
     } else {
       display_solution(true, ball_in_hand_solution.coordinates);
+      write_to_file(get_json_for_solution(true, ball_in_hand_solution.coordinates));
     }
   } else {
     display_solution(false, cue_ball);
+    write_to_file(get_json_for_solution(false, cue_ball));
   }
   auto end = std::chrono::system_clock::now();
 
