@@ -11,12 +11,34 @@
   </head>
   <body>
     <div id="ball_in_hand"/>
-    <div id="pool_table">
+    <div id="pool_table" style="float: left; width: 1150px;">
+      &nbsp;
       <img style="position:absolute" width="1100" height="604" src="http://corksandcleaver.com/v/2017/02/billiard-table-sizes-billiard-tables-billiards-table-dimensions-billiard-table-parts-billiard-table-felt-billiard-table-clearance-billiard-table-repair-carom-billiard-table-billiard-tables.png"/>
       <canvas style="position:absolute; top: 49px; left: 53px" id="canvas" width="1050" height="550" z-index="-1" />
     </div>
+    <div style="width: 300px; float: left">
+      <div>Use left and right arrow keys to change turns.</div>
+      <div>
+        Strength: <span id="strength"></span>
+      </div>
+      <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
+      <div>Strength: <span id="strength"></span></div>
+      <div>Spin: <span id="spin"></span></div>
+    </div>
     <script src="game_data.js"></script>
     <script>
+      document.onkeydown = checkKey;
+
+      function checkKey(e) {
+        e = e || window.event;
+
+        if (e.keyCode == '37') {
+          previous_turn();
+        }
+        else if (e.keyCode == '39') {
+          next_turn();
+        }
+      }
       function Line(x1,y1,x2,y2){
           this.x1=x1;
           this.y1=y1;
@@ -61,10 +83,6 @@
       }
 
       function draw_line(context, start, end) {
-        console.log(convert_game_units_to_canvas_units(start[0]))
-        console.log(convert_game_units_to_canvas_units(start[1]))
-        console.log(convert_game_units_to_canvas_units(end[0]))
-        console.log(convert_game_units_to_canvas_units(end[1]))
         new Line(
           convert_game_units_to_canvas_units(start[1]) + 12,
           convert_game_units_to_canvas_units(start[0]) + BALL_OFFSET,
@@ -164,6 +182,9 @@
 
         let turn_data = game_data["turns"][current_turn]
 
+        document.getElementById('strength').innerHTML = turn_data["strength"]
+        document.getElementById('spin').innerHTML = turn_data["spin"]
+        document.getElementById('remaining_difficulty').innerHTML = turn_data["runout_difficulty"]
         render_img(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
         for (let i = 0; i < game_data["object_balls"].length; ++i) {
           if (sunk_object_balls.has(i)) {
