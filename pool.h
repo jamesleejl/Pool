@@ -446,7 +446,6 @@ segment_intersection_struct get_intersection_of_line_segments(
   segment_intersection.has_intersection = false;
   if (det == 0)
   {
-    cout << "HERE1" << endl;
     return segment_intersection;
   }
   double x = (B2 * C1 - B1 * C2) / det;
@@ -868,10 +867,10 @@ void populate_selected_shot_table()
   {
     process_object_ball_combinations(object_balls.size(), i);
   }
-  selected_shot_struct selected_shot = selected_shot_table[8][3][7];
-  cout << selected_shot.object_ball << endl;
-  cout << selected_shot.pocket << endl;
-  cout << selected_shot.total_weighted_difficulty << endl;
+  selected_shot_struct selected_shot = selected_shot_table[8][63][0];
+  cout << (int)selected_shot.object_ball << endl;
+  cout << (int)selected_shot.pocket << endl;
+  cout << (int)selected_shot.total_weighted_difficulty << endl;
 }
 
 /*

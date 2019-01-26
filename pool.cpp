@@ -14,12 +14,12 @@ int main()
   cout << endl;
   auto start = std::chrono::system_clock::now();
 
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH);
+  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 7);
   cue_ball = Vector2d(0.15, DIAMOND_LENGTH * 4);
   for (unsigned char i = 0; i < 7; ++i)
   {
-    object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.2 + DIAMOND_LENGTH * 0.2 * i, DIAMOND_LENGTH * 4));
-    opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 1.6 + DIAMOND_LENGTH * 0.2 * i, DIAMOND_LENGTH * 4.15));
+    object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.5 * i, DIAMOND_LENGTH));
+    opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0 + DIAMOND_LENGTH * 0, DIAMOND_LENGTH * 0));
   }
 
   initialize_pockets();
