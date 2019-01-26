@@ -40,6 +40,7 @@ int main()
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
   populate_shot_path_table();
+  populate_shot_info_and_path_table();
   populate_selected_shot_table();
 
   if (get_ball_in_hand_solution)

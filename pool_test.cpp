@@ -622,13 +622,13 @@ TEST_F(PoolTest, PopulateShotPathTable)
   populate_shot_path_table();
 
   shot_path_struct &current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][0][10][2];
-  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_FALSE(current_shot_path.possible);
   current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][1][10][2];
-  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_FALSE(current_shot_path.possible);
   current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][2][10][2];
-  EXPECT_FALSE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_FALSE(current_shot_path.possible);
   current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][4][10][2];
-  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_TRUE(current_shot_path.possible);
   current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][3][10][2];
   EXPECT_EQ(3, current_shot_path.path_segments.size());
   expect_vector2d_equal(Vector2d(4, 8), current_shot_path.path_segments[0]);
@@ -636,7 +636,7 @@ TEST_F(PoolTest, PopulateShotPathTable)
   expect_vector2d_equal(Vector2d(4, 2.0100021), current_shot_path.path_segments[2]);
   expect_vector2d_equal(Vector2d(4, 2.0100021), current_shot_path.final_position);
   EXPECT_FALSE(current_shot_path.shot_obstructions.has_permanent_obstruction);
-  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_TRUE(current_shot_path.possible);
   current_shot_path = shot_path_table[UNITS_PER_DIAMOND][UNITS_PER_DIAMOND * 3][0][5][10][2];
   EXPECT_EQ(3, current_shot_path.path_segments.size());
   expect_vector2d_equal(Vector2d(4.2109075, 7.6723242), current_shot_path.path_segments[0]);
@@ -644,7 +644,7 @@ TEST_F(PoolTest, PopulateShotPathTable)
   expect_vector2d_equal(Vector2d(2.7153702, 3.5437806), current_shot_path.path_segments[2]);
   expect_vector2d_equal(Vector2d(2.7153702, 3.5437806), current_shot_path.final_position);
   EXPECT_FALSE(current_shot_path.shot_obstructions.has_permanent_obstruction);
-  EXPECT_TRUE(current_shot_path.within_acceptable_difficulty);
+  EXPECT_TRUE(current_shot_path.possible);
 }
 
 } // namespace
