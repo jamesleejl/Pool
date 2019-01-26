@@ -11,16 +11,27 @@ using namespace std;
 
 int main()
 {
-  cout << endl;
   auto start = std::chrono::system_clock::now();
 
-  eight_ball = Vector2d(DIAMOND_LENGTH, DIAMOND_LENGTH * 7);
-  cue_ball = Vector2d(0.15, DIAMOND_LENGTH * 4);
-  for (unsigned char i = 0; i < 7; ++i)
-  {
-    object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0.5 * i, DIAMOND_LENGTH));
-    opponent_object_balls.push_back(Vector2d(DIAMOND_LENGTH * 0 + DIAMOND_LENGTH * 0, DIAMOND_LENGTH * 0));
-  }
+  bool get_ball_in_hand_solution = false;
+  eight_ball = Vector2d(UNITS_PER_DIAMOND, 12);
+  unsigned_short_int_coordinates_struct cue_ball;
+  cue_ball.x = 7;
+  cue_ball.y = 10;
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 3));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 0, UNITS_PER_DIAMOND * 3));
+  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 3));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
 
   initialize_pockets();
   initialize_table_edges();
@@ -29,9 +40,26 @@ int main()
   populate_shot_info_table_obstructions();
   populate_shot_info_table_difficulty();
   populate_shot_path_table();
-
   populate_selected_shot_table();
 
+  if (get_ball_in_hand_solution)
+  {
+    ball_in_hand_solution_struct ball_in_hand_solution = find_ball_in_hand_solution();
+    if (!ball_in_hand_solution.possible)
+    {
+      cout << "No solution" << endl;
+    }
+    else
+    {
+      display_solution(true, ball_in_hand_solution.coordinates);
+      write_to_file(get_json_for_solution(true, ball_in_hand_solution.coordinates));
+    }
+  }
+  else
+  {
+    display_solution(false, cue_ball);
+    write_to_file(get_json_for_solution(false, cue_ball));
+  }
   auto end = std::chrono::system_clock::now();
 
   std::chrono::duration<double> elapsed_seconds = end - start;
