@@ -13,25 +13,23 @@ int main()
 {
   auto start = std::chrono::system_clock::now();
 
-  bool get_ball_in_hand_solution = false;
-  eight_ball = Vector2d(UNITS_PER_DIAMOND, 12);
-  unsigned_short_int_coordinates_struct cue_ball;
-  cue_ball.x = 7;
-  cue_ball.y = 10;
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND, UNITS_PER_DIAMOND));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 3, UNITS_PER_DIAMOND));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 2));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2, UNITS_PER_DIAMOND * 3));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 0, UNITS_PER_DIAMOND * 3));
-  object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 3));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
-  opponent_object_balls.push_back(Vector2d(UNITS_PER_DIAMOND * 2.5, 0));
+  ball_in_hand = false;
+  eight_ball = get_vector_from_ball_position_in_diamonds(1, 6);
+  cue_ball = get_vector_from_ball_position_in_diamonds(3.5, 5);
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(1, 1));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 1));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(3, 1));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 2));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 3));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(0, 3));
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(4, 3));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
 
   initialize_pockets();
   initialize_table_edges();
@@ -43,24 +41,10 @@ int main()
   populate_shot_info_and_path_table();
   populate_selected_shot_table();
 
-  if (get_ball_in_hand_solution)
-  {
-    ball_in_hand_solution_struct ball_in_hand_solution = find_ball_in_hand_solution();
-    if (!ball_in_hand_solution.possible)
-    {
-      cout << "No solution" << endl;
-    }
-    else
-    {
-      display_solution(true, ball_in_hand_solution.coordinates);
-      write_to_file(get_json_for_solution(true, ball_in_hand_solution.coordinates));
-    }
-  }
-  else
-  {
-    display_solution(false, cue_ball);
-    write_to_file(get_json_for_solution(false, cue_ball));
-  }
+  Vector2d initial_cue_ball_position = get_cue_ball_position_for_runout();
+  display_solution(initial_cue_ball_position);
+  write_to_file(get_json_for_solution(initial_cue_ball_position));
+
   auto end = std::chrono::system_clock::now();
 
   std::chrono::duration<double> elapsed_seconds = end - start;

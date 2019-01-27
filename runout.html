@@ -13,10 +13,9 @@
 
 <body>
   <div id="ball_in_hand" />
-  <div id="pool_table" style="float: left; width: 1150px;height:604px;">
-    &nbsp;
-    <img style="position:absolute" width="1100" height="604" src="http://corksandcleaver.com/v/2017/02/billiard-table-sizes-billiard-tables-billiards-table-dimensions-billiard-table-parts-billiard-table-felt-billiard-table-clearance-billiard-table-repair-carom-billiard-table-billiard-tables.png" />
-    <canvas style="position:absolute; top: 45px; left: 50px" id="canvas" width="1050" height="550" z-index="-1" />
+  <div id="pool_table" style="float: left; width: 1000px;height:604px;">
+    <img style="position:absolute; opacity: 0.7" width="899" height="499" src="http://corksandcleaver.com/v/2017/02/billiard-table-sizes-billiard-tables-billiards-table-dimensions-billiard-table-parts-billiard-table-felt-billiard-table-clearance-billiard-table-repair-carom-billiard-table-billiard-tables.png" />
+    <canvas style="position:absolute; top: 48px; left: 48px" id="canvas" width="800" height="400" z-index="-1" />
   </div>
   <div style="width: 300px; float: left">
     <div>Use left and right arrow keys to change turns.</div>
@@ -26,7 +25,11 @@
   </div>
   <script src="game_data.js"></script>
   <script>
-    document.onkeydown = checkKey;
+    BALL_RADIUS_IN_DIAMONDS = 0.09
+    // TODO: Is this extra parameter necessary?
+    EXTRA_OFFSET_IN_DIAMONDS = 0.1
+
+    document.onkeydown = checkKey
 
     function checkKey(e) {
       e = e || window.event;
@@ -83,10 +86,10 @@
 
     function draw_line(context, start, end) {
       new Line(
-        convert_game_units_to_canvas_units(start[1]) + 12,
-        convert_game_units_to_canvas_units(start[0]) + BALL_OFFSET,
-        convert_game_units_to_canvas_units(end[1]) + 12,
-        convert_game_units_to_canvas_units(end[0]) + BALL_OFFSET)
+        convert_game_units_to_canvas_units(start[1]),
+        convert_game_units_to_canvas_units(start[0]),
+        convert_game_units_to_canvas_units(end[1]),
+        convert_game_units_to_canvas_units(end[0]))
         .drawWithArrowheads(context);
     }
 
@@ -95,6 +98,10 @@
         img,
         convert_game_units_to_canvas_units(y_in_diamonds),
         convert_game_units_to_canvas_units(x_in_diamonds))
+    }
+
+    function render_ball(context, img, x_in_diamonds, y_in_diamonds) {
+      render_img(context, img, x_in_diamonds - BALL_RADIUS_IN_DIAMONDS - EXTRA_OFFSET_IN_DIAMONDS, y_in_diamonds - BALL_RADIUS_IN_DIAMONDS - EXTRA_OFFSET_IN_DIAMONDS)
     }
 
     function add_to_sunk_object_balls(object_ball) {
@@ -136,7 +143,7 @@
       return img
     }
 
-    CANVAS_HEIGHT = 487
+    CANVAS_HEIGHT = 400
     CANVAS_WIDTH = 2 * CANVAS_HEIGHT
     UNITS_PER_DIAMOND = CANVAS_HEIGHT / 4
     BALL_OFFSET = 10
@@ -184,28 +191,27 @@
       document.getElementById('strength').innerHTML = turn_data["strength"]
       document.getElementById('spin').innerHTML = turn_data["spin"]
       document.getElementById('remaining_difficulty').innerHTML = turn_data["runout_difficulty"]
-      render_img(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
+      render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
       for (let i = 0; i < game_data["object_balls"].length; ++i) {
         if (sunk_object_balls.has(i)) {
           continue
         }
-        render_img(
+        render_ball(
           context,
           object_ball_imgs[i],
           game_data["object_balls"][i][0],
           game_data["object_balls"][i][1])
       }
       for (let i = 0; i < game_data["opponent_object_balls"].length; ++i) {
-        render_img(
+        render_ball(
           context,
           opponent_object_ball_imgs[i],
           game_data["opponent_object_balls"][i][0],
           game_data["opponent_object_balls"][i][1])
       }
       if (!sunk_object_balls.has(game_data["object_balls"].length)) {
-        render_img(context, eight_ball_img, game_data["eight_ball"][0], game_data["eight_ball"][1])
+        render_ball(context, eight_ball_img, game_data["eight_ball"][0], game_data["eight_ball"][1])
       }
-      draw_line(context, [0, 0], [4 * UNITS_PER_DIAMOND, 8 * UNITS_PER_DIAMOND])
       draw_line(context, turn_data["cue_ball"], turn_data["path"][0])
       for (let i = 0; i < turn_data["path"].length - 1; ++i) {
         draw_line(context, turn_data["path"][i], turn_data["path"][i + 1])

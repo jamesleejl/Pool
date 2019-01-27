@@ -160,21 +160,6 @@ struct unsigned_short_int_coordinates_struct
 };
 
 /**
- * Holds information about ball in hand.
- */
-struct ball_in_hand_solution_struct
-{
-  /**
-   * Whether there is a solution or not.
-   */
-  bool possible = false;
-  /**
-   * The coordinates.
-   */
-  unsigned_short_int_coordinates_struct coordinates;
-};
-
-/**
  * Holds information about a ball path after reflection off a single rail of a pool table.
  */
 struct single_rail_reflection_struct
@@ -281,37 +266,6 @@ struct selected_shot_struct
 };
 
 /**
- * Information about the best runout given ball in hand.
- */
-struct solution_struct
-{
-  /**
-   * Whether the shot is possible or not.
-   */
-  bool possible = false;
-  /**
-   * The starting x-coordinate of the cue ball. Only applicable if this is ball in hand.
-   * Only populated if possible is true.
-   */
-  unsigned short int cue_ball_x;
-  /**
-   * The starting y-coordinate of the cue ball. Only applicable if this is ball in hand.
-   * Only populated if possible is true.
-   */
-  unsigned short int cue_ball_y;
-  /**
-   * The list of selected_shot_structs representing the shots taken.
-   * Only populated if possible is true.
-   */
-  vector<selected_shot_struct> shots;
-  /**
-   * The total weighted difficulty of the runout starting from this ball.
-   * Only populated if possible is true.
-   */
-  float total_weighted_difficulty = std::numeric_limits<float>::infinity();
-};
-
-/**
  * The name of the file to output game data.
  */
 const string GAME_DATA_FILE = "game_data.js";
@@ -349,10 +303,15 @@ const unsigned short int LENGTH = WIDTH * 2;
  * The maximum number of diamonds the cue ball can travel if untouched by an object ball.
  */
 const unsigned short int MAX_DIAMONDS = 30;
+bool ball_in_hand = false;
 /**
  * The positions of the pockets.
  */
 vector<Vector2d> pockets;
+/**
+ * The position of the cue ball.
+ */
+Vector2d cue_ball;
 /**
  * The position of the eight ball.
  */
@@ -463,6 +422,36 @@ string path_to_string(vector<Vector2d> path)
     ret += vec_string + " ";
   }
   return ret;
+}
+
+/**
+ * Balls cannot be within BALL_RADIUS distance of the rail. Because the ball is not a point,
+ * we must push them away from the rail by the ball's radius.
+ */
+Vector2d move_ball_in_from_rails(Vector2d position) {
+  float x_position_in_units = position.x();
+  float y_position_in_units = position.y();
+  if (x_position_in_units < BALL_RADIUS) {
+    x_position_in_units = BALL_RADIUS;
+  } else if (x_position_in_units > WIDTH - BALL_RADIUS) {
+    x_position_in_units = WIDTH - BALL_RADIUS;
+  }
+  if (y_position_in_units < BALL_RADIUS) {
+    y_position_in_units = BALL_RADIUS;
+  } else if (y_position_in_units > LENGTH - BALL_RADIUS) {
+    y_position_in_units = LENGTH - BALL_RADIUS;
+  }
+  return Vector2d(x_position_in_units, y_position_in_units);
+}
+
+/**
+ * Balls cannot be within BALL_RADIUS distance of the rail. Because the ball is not a point,
+ * we must push them away from the rail by the ball's radius.
+ */
+Vector2d get_vector_from_ball_position_in_diamonds(float x_position_in_diamonds, float y_position_in_diamonds) {
+  float x_position_in_units = x_position_in_diamonds * UNITS_PER_DIAMOND;
+  float y_position_in_units = y_position_in_diamonds * UNITS_PER_DIAMOND;
+  return move_ball_in_from_rails(Vector2d(x_position_in_units, y_position_in_units));
 }
 
 /**
@@ -767,7 +756,7 @@ void populate_shot_info_table_obstructions()
             shot_info.possible = false;
             continue;
           }
-          Vector2d cue_ball = Vector2d(w, l);
+          Vector2d cue_ball = move_ball_in_from_rails(Vector2d(w, l));
           obstructions_struct cue_to_object_obstructions =
               get_obstructions_on_segment_for_shot(o, cue_ball, shot_info.ghost_ball->coords, false);
           if (cue_to_object_obstructions.has_permanent_obstruction)
@@ -869,7 +858,7 @@ void populate_shot_info_table_difficulty()
           }
           else
           {
-            shot_info.difficulty = get_shot_difficulty(Vector2d(w, l), ghost_ball_position.coords, p);
+            shot_info.difficulty = get_shot_difficulty(move_ball_in_from_rails(Vector2d(w, l)), ghost_ball_position.coords, p);
             shot_info.weighted_difficulty = shot_info.difficulty * shot_info.difficulty;
             if (shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
             {
@@ -1181,7 +1170,7 @@ void populate_shot_path_table()
         for (unsigned short int l = 0; l <= LENGTH; ++l)
         {
           const ghost_ball_struct &ghost_ball_position = *shot_info_table[w][l][o][p].ghost_ball;
-          shot_angle_struct shot_angle = get_shot_angle(Vector2d(w, l), ghost_ball_position.coords, pockets[p]);
+          shot_angle_struct shot_angle = get_shot_angle(move_ball_in_from_rails(Vector2d(w, l)), ghost_ball_position.coords, pockets[p]);
           for (unsigned short int st = 0; st < NUM_STRENGTHS; ++st)
           {
             for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
@@ -1431,10 +1420,11 @@ void populate_selected_shot_table()
   }
 }
 
-const ball_in_hand_solution_struct find_ball_in_hand_solution()
+const Vector2d find_ball_in_hand_solution()
 {
   unsigned short int max_object_ball_index = (unsigned short int)pow(2, object_balls.size()) - 1;
-  ball_in_hand_solution_struct ball_in_hand_solution;
+  float x = 0;
+  float y = 0;
   float minimum_difficulty = std::numeric_limits<float>::infinity();
   for (unsigned short int w = 0; w <= WIDTH; ++w)
   {
@@ -1442,14 +1432,21 @@ const ball_in_hand_solution_struct find_ball_in_hand_solution()
     {
       if (selected_shot_table[w][l][max_object_ball_index].total_weighted_difficulty < minimum_difficulty)
       {
-        ball_in_hand_solution.possible = true;
-        ball_in_hand_solution.coordinates.x = w;
-        ball_in_hand_solution.coordinates.y = l;
+        x = w;
+        y = l;
         minimum_difficulty = selected_shot_table[w][l][max_object_ball_index].total_weighted_difficulty;
       }
     }
   }
-  return ball_in_hand_solution;
+  return move_ball_in_from_rails(Vector2d(x, y));
+}
+
+const Vector2d get_cue_ball_position_for_runout()
+{
+  if (ball_in_hand) {
+    return find_ball_in_hand_solution();
+  }
+  return cue_ball;
 }
 
 string zero_based_index_to_one_based_index_string(unsigned short int index)
@@ -1527,17 +1524,19 @@ string unsigned_short_int_coordinates_struct_to_string(unsigned_short_int_coordi
   return vector_to_string(Vector2d(coordinates.x, coordinates.y));
 }
 
-void display_solution(bool is_ball_in_hand, unsigned_short_int_coordinates_struct cue_ball)
+void display_solution(Vector2d intiial_cue_ball)
 {
   unsigned short int combo = (unsigned short int)pow(2, object_balls.size()) - 1;
 
-  unsigned_short_int_coordinates_struct coords = cue_ball;
+  unsigned_short_int_coordinates_struct coords;
+  coords.x = (unsigned short int) (intiial_cue_ball.x() + 0.5);
+  coords.y = (unsigned short int) (intiial_cue_ball.y() + 0.5);
   unsigned short int shot_number = 1;
   cout << endl;
   cout << "Table layout: " << endl;
   cout << "-------------" << endl;
-  cout << "Ball in hand: " << (is_ball_in_hand ? "True" : "False") << endl;
-  cout << "Cue ball: " << unsigned_short_int_coordinates_struct_to_string(cue_ball) << endl;
+  cout << "Ball in hand: " << (ball_in_hand ? "True" : "False") << endl;
+  cout << "Cue ball: " << unsigned_short_int_coordinates_struct_to_string(coords) << endl;
   cout << "Eight ball: " << vector_to_string(eight_ball) << endl;
   cout << "Object balls: ";
   for (unsigned short int o = 0; o < object_balls.size(); ++o)
@@ -1588,18 +1587,20 @@ void write_to_file(string json)
   myfile.close();
 }
 
-string get_json_for_solution(bool is_ball_in_hand, unsigned_short_int_coordinates_struct cue_ball)
+string get_json_for_solution(Vector2d initial_cue_ball)
 {
   json game_data;
 
   unsigned short int combo = (unsigned short int)pow(2, object_balls.size()) - 1;
 
-  unsigned_short_int_coordinates_struct coords = cue_ball;
+  unsigned_short_int_coordinates_struct coords;
+  coords.x = (unsigned short int) (initial_cue_ball.x() + 0.5);
+  coords.y = (unsigned short int) (initial_cue_ball.y() + 0.5);
   unsigned short int shot_number = 1;
 
   game_data["units_per_diamond"] = UNITS_PER_DIAMOND;
-  game_data["ball_in_hand"] = is_ball_in_hand;
-  game_data["cue_ball"] = {cue_ball.x, cue_ball.y};
+  game_data["ball_in_hand"] = ball_in_hand;
+  game_data["cue_ball"] = {initial_cue_ball.x(), initial_cue_ball.y()};
   game_data["eight_ball"] = {eight_ball.x(), eight_ball.y()};
   game_data["object_balls"] = {};
   game_data["turns"] = {};
