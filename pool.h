@@ -311,7 +311,7 @@ const string GAME_DATA_FILE = "game_data.js";
 /**
  * The length of a diamond in units.
  */
-const unsigned short int UNITS_PER_DIAMOND = 2;
+const unsigned short int UNITS_PER_DIAMOND = 4;
 /**
  * The number of shot strengths to consider. If this is not 12, strength_to_distance must be changed.
  */
@@ -1318,7 +1318,8 @@ void populate_eight_ball_in_selected_shot_table()
           {
             shot_path_struct &current_shot_path = shot_path_table[w][l][eight_ball_index()][p][st][sp];
             if (current_shot_path.possible &&
-                !current_shot_path.shot_obstructions.has_permanent_obstruction)
+                !current_shot_path.shot_obstructions.has_permanent_obstruction &&
+                current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
             {
               selected_shot.possible = true;
               selected_shot.strength = st;
