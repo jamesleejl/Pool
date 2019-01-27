@@ -19,6 +19,7 @@
   </div>
   <div style="width: 300px; float: left">
     <div>Use left and right arrow keys to change turns.</div>
+    <div>Shot Difficulty: <span id="shot_difficulty"></span></div>
     <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
     <div>Strength: <span id="strength"></span></div>
     <div>Spin: <span id="spin"></span></div>
@@ -199,7 +200,8 @@
 
       document.getElementById('strength').innerHTML = turn_data["strength"]
       document.getElementById('spin').innerHTML = turn_data["spin"]
-      document.getElementById('remaining_difficulty').innerHTML = turn_data["runout_difficulty"]
+      document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
+      document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)
       render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
       if (render_next_shot && current_turn != game_data["turns"].length - 1) {
         render_ball(context, cue_ball_img, turn_data["missed_cue_ball_1"][0], turn_data["missed_cue_ball_1"][1])

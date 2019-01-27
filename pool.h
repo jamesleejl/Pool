@@ -104,6 +104,10 @@ struct shot_path_struct
    * The final location of the cue ball along this path.
    */
   Vector2d final_position;
+  /**
+   * The difficulty of the shot. Does not take obstructions into account. Always populated.
+   */
+  float difficulty = std::numeric_limits<float>::infinity();
 };
 
 /**
@@ -114,6 +118,8 @@ struct shot_info_and_path_struct
   const shot_info_struct *shot_info;
   const shot_path_struct *shot_path;
   bool possible = true;
+  float difficulty = std::numeric_limits<float>::infinity();
+  float weighted_difficulty = std::numeric_limits<float>::infinity();
 };
 
 /**
@@ -257,6 +263,7 @@ struct selected_shot_struct
    * Only populated if possible is true.
    */
   float total_weighted_difficulty = std::numeric_limits<float>::infinity();
+  float current_weighted_difficulty = std::numeric_limits<float>::infinity();
   /**
    * The points defining the line segments the cue ball travels along after contact with the object ball.
    * Only populated if possible is true.
@@ -323,7 +330,7 @@ const unsigned short int NUM_SPINS = 5;
 /**
  * The maximum difficulty of individual shot to consider shooting.
  */
-const unsigned int MAX_DIFFICULTY_SHOT_TO_CONSIDER = 5000;
+const unsigned int MAX_DIFFICULTY_SHOT_TO_CONSIDER = 5 * UNITS_PER_DIAMOND * 5 * UNITS_PER_DIAMOND * 1.33;
 /**
  * The unit diameter of the balls.
  */
@@ -892,12 +899,10 @@ void populate_shot_info_table_difficulty()
           if (!shot_info.possible)
           {
             shot_info.difficulty = std::numeric_limits<float>::infinity();
-            shot_info.weighted_difficulty = std::numeric_limits<float>::infinity();
           }
           else
           {
             shot_info.difficulty = get_shot_difficulty(move_ball_in_from_rails(Vector2d(w, l)), ghost_ball_position.coords, p);
-            shot_info.weighted_difficulty = shot_info.difficulty * shot_info.difficulty;
             if (shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
             {
               shot_info.possible = false;
@@ -1287,7 +1292,12 @@ void populate_shot_info_and_path_table()
               if (!current_shot_info_and_path.shot_info->possible || !current_shot_info_and_path.shot_path->possible)
               {
                 current_shot_info_and_path.possible = false;
+                continue;
               }
+              current_shot_info_and_path.difficulty =
+                shot_info->difficulty * (1 + (strength_to_distance(st) / MAX_DIAMONDS * UNITS_PER_DIAMOND * 0.33));
+              current_shot_info_and_path.weighted_difficulty =
+                current_shot_info_and_path.difficulty * current_shot_info_and_path.difficulty;
             }
           }
         }
@@ -1307,8 +1317,7 @@ void populate_eight_ball_in_selected_shot_table()
       {
         shot_info_struct &current_shot_info = shot_info_table[w][l][eight_ball_index()][p];
         if (current_shot_info.shot_obstructions.has_permanent_obstruction ||
-            current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER ||
-            current_shot_info.weighted_difficulty > selected_shot.total_weighted_difficulty)
+            current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
         {
           continue;
         }
@@ -1316,17 +1325,18 @@ void populate_eight_ball_in_selected_shot_table()
         {
           for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
           {
-            shot_path_struct &current_shot_path = shot_path_table[w][l][eight_ball_index()][p][st][sp];
-            if (current_shot_path.possible &&
-                !current_shot_path.shot_obstructions.has_permanent_obstruction &&
-                current_shot_info.weighted_difficulty < selected_shot.total_weighted_difficulty)
+            shot_info_and_path_struct &current_shot_info_and_path = shot_info_and_path_table[w][l][eight_ball_index()][p][st][sp];
+            const shot_path_struct &current_shot_path = *current_shot_info_and_path.shot_path;
+            if (current_shot_info_and_path.possible &&
+                current_shot_info_and_path.weighted_difficulty < selected_shot.total_weighted_difficulty)
             {
               selected_shot.possible = true;
               selected_shot.strength = st;
               selected_shot.spin = sp;
               selected_shot.object_ball = eight_ball_index();
               selected_shot.pocket = p;
-              selected_shot.total_weighted_difficulty = current_shot_info.weighted_difficulty;
+              selected_shot.total_weighted_difficulty = current_shot_info_and_path.weighted_difficulty;
+              selected_shot.current_weighted_difficulty = current_shot_info_and_path.weighted_difficulty;
               selected_shot.path_segments = current_shot_path.path_segments;
             }
           }
@@ -1339,10 +1349,9 @@ void populate_eight_ball_in_selected_shot_table()
 /**
  * Gets the difficulty of the rest of the shots in the runout if the selected shot is chosen.
  */
-remaining_runout_struct get_remaining_runout_difficulty(const shot_info_struct &current_shot_info, const shot_path_struct& current_shot_path, unsigned short int combo, set<unsigned short int> &balls, unsigned short int ball) {
+remaining_runout_struct get_remaining_runout_difficulty(const shot_info_and_path_struct& current_shot_info_and_path, const shot_path_struct& current_shot_path, unsigned short int combo, set<unsigned short int> &balls, unsigned short int ball) {
   remaining_runout_struct ret;
-  if (!current_shot_path.possible ||
-      current_shot_path.shot_obstructions.has_permanent_obstruction)
+  if (!current_shot_info_and_path.possible)
   {
     ret.difficulty = std::numeric_limits<float>::infinity();
     return ret;
@@ -1390,8 +1399,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
         {
           shot_info_struct &current_shot_info = shot_info_table[w][l][ball][p];
           if (current_shot_info.shot_obstructions.has_permanent_obstruction ||
-              current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER ||
-              current_shot_info.weighted_difficulty > selected_shot.total_weighted_difficulty)
+              current_shot_info.difficulty > MAX_DIFFICULTY_SHOT_TO_CONSIDER)
           {
             continue;
           }
@@ -1420,15 +1428,16 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
               if (missed_strength_2 >= NUM_STRENGTHS) {
                 missed_strength_2 = st - 2;
               }
+              const shot_info_and_path_struct & current_shot_info_and_path = shot_info_and_path_table[w][l][ball][p][st][sp];
               shot_path_struct &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
               shot_path_struct &missed_shot_path_1 = shot_path_table[w][l][ball][p][missed_strength_1][sp];
               shot_path_struct &missed_shot_path_2 = shot_path_table[w][l][ball][p][missed_strength_2][sp];
               remaining_runout_struct expected_shot_remaining_runout =
-                  get_remaining_runout_difficulty(current_shot_info, current_shot_path, combo, balls, ball);
+                  get_remaining_runout_difficulty(current_shot_info_and_path, current_shot_path, combo, balls, ball);
               remaining_runout_struct missed_shot_1_remaining_runout =
-                  get_remaining_runout_difficulty(current_shot_info, missed_shot_path_1, combo, balls, ball);
+                  get_remaining_runout_difficulty(current_shot_info_and_path, missed_shot_path_1, combo, balls, ball);
               remaining_runout_struct missed_shot_2_remaining_runout =
-                  get_remaining_runout_difficulty(current_shot_info, missed_shot_path_2, combo, balls, ball);
+                  get_remaining_runout_difficulty(current_shot_info_and_path, missed_shot_path_2, combo, balls, ball);
               if (expected_shot_remaining_runout.difficulty == std::numeric_limits<float>::infinity()) {
                 continue;
               }
@@ -1442,7 +1451,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
               unsigned short int rounded_x = (unsigned short int)(0.5 + current_shot_path.final_position.x());
               unsigned short int rounded_y = (unsigned short int)(0.5 + current_shot_path.final_position.y());
               float new_weighted_difficulty =
-                  current_shot_info.weighted_difficulty +
+                  current_shot_info_and_path.weighted_difficulty +
                   0.5 * expected_shot_remaining_runout.difficulty +
                   0.25 * missed_shot_1_remaining_runout.difficulty +
                   0.25 * missed_shot_2_remaining_runout.difficulty;
@@ -1454,6 +1463,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
                 selected_shot.spin = sp;
                 selected_shot.object_ball = ball;
                 selected_shot.pocket = p;
+                selected_shot.current_weighted_difficulty = current_shot_info_and_path.weighted_difficulty;
                 selected_shot.total_weighted_difficulty = new_weighted_difficulty;
                 selected_shot.path_segments = current_shot_path.path_segments;
                 selected_shot.next_x = rounded_x;
@@ -1668,6 +1678,7 @@ void display_solution(Vector2d intiial_cue_ball)
     cout << "Object ball target: " << object_ball_index_to_string(selected_shot.object_ball) << endl;
     cout << "Pocket: " << pocket_to_string(selected_shot.pocket) << endl;
     cout << "Difficulty from this shot onwards: " << selected_shot.total_weighted_difficulty << endl;
+    cout << "Difficulty of this shot: " << selected_shot.current_weighted_difficulty << endl;
     cout << "Strength (1-" << to_string(NUM_STRENGTHS) << "): " << strength_to_string(selected_shot.strength) << endl;
     cout << "Spin: " << spin_to_string(selected_shot.spin) << endl;
     cout << "Cue ball path: " << path_to_string(selected_shot.path_segments) << endl;
@@ -1736,6 +1747,7 @@ string get_json_for_solution(Vector2d initial_cue_ball)
     turn["pocket_index"] = selected_shot.pocket;
     turn["pocket_coords"] = {pockets[selected_shot.pocket].x(), pockets[selected_shot.pocket].y()};
     turn["runout_difficulty"] = selected_shot.total_weighted_difficulty;
+    turn["shot_difficulty"] = selected_shot.current_weighted_difficulty;
     turn["strength"] = selected_shot.strength;
     turn["spin"] = selected_shot.spin;
     turn["expected_cue_ball"] = {selected_shot.expected_cue_ball.x(), selected_shot.expected_cue_ball.y()};
