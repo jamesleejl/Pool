@@ -227,6 +227,7 @@ struct shot_angle_struct
    * The minimum travel distance of a stunned cue ball after contact with the ghost ball.
    */
   float minimum_travel_distance_of_cue_ball;
+  Vector2d cue_ball_to_ghost_ball;
 };
 
 /**
@@ -1120,13 +1121,6 @@ float strength_to_distance(unsigned short int strength)
  * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
  * To calculate minimum travel distance of the cue ball, the following paper is used:
  *   https://billiards.colostate.edu/technical_proofs/TP_3-2.pdf
- * TODO: Add this code.
-  Vector2d initial = Vector2d(3, 4);
-  Vector2d cue_ball_path = shot_angle.origin - initial;
-  float angle = acos(shot_angle.pocket_direction.dot(cue_ball_path) /
-    (cue_ball_path.norm() * shot_angle.pocket_direction.norm()));
-  float draw_angle = 180 - atan(sin(angle)*sin(angle) - sin(angle)*cos(angle)/ 4);
-  angle += draw_angle;
  */
 shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost_ball, const Vector2d &pocket)
 {
@@ -1156,7 +1150,38 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
   float sin_squared = 1 - cos_squared;
   shot_angle.fractional_distance = sin_squared;
   shot_angle.minimum_travel_distance_of_cue_ball = ghost_ball_to_pocket.norm() * sin_squared / cos_squared;
+  shot_angle.cue_ball_to_ghost_ball = -1 * ghost_ball_to_cue_ball;
   return shot_angle;
+}
+
+// In radians. Uses estimates from https://billiards.colostate.edu/technical_proofs/new/TP_B-14.pdf.
+// This is for 'good' draw.
+// This is how much it's deflected from the original aim line (ghost ball to cue ball.)
+float estimate_draw_angle_from_cut_angle(float cut_angle) {
+  if (cut_angle < 0.349) {
+    return cut_angle * 4;
+  } else if (cut_angle < 40) {
+    return cut_angle * 3;
+  } else {
+    return 4 * cut_angle / 3 + 1.047;
+  }
+}
+
+// In radians. Uses estimates from https://billiards.colostate.edu/technical_proofs/new/TP_B-13.pdf.
+// This is for 'good' follow.
+// This is how much it is deflected from the original aim line.
+float estimate_follow_angle_from_cut_angle(float cut_angle) {
+  if (cut_angle < 0.253) {
+    return cut_angle * 3;
+  } else if (cut_angle < 0.848) {
+    return cut_angle * 0.611;
+  } else {
+    float ret = 1.1 - cut_angle;
+    if (ret < 0) {
+      return 0;
+    }
+    return ret;
+  }
 }
 
 /**
