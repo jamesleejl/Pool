@@ -23,7 +23,7 @@ int main()
   object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 3));
   object_balls.push_back(get_vector_from_ball_position_in_diamonds(0, 3));
   object_balls.push_back(get_vector_from_ball_position_in_diamonds(4, 3));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(1, 3));
   opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
   opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
   opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));

@@ -30,6 +30,7 @@
     EXTRA_OFFSET_IN_DIAMONDS = 0.1
 
     document.onkeydown = checkKey
+    render_next_shot = false
 
     function checkKey(e) {
       e = e || window.event;
@@ -39,6 +40,9 @@
       }
       else if (e.keyCode == '39') {
         next_turn();
+      } else if (e.keyCode == '84') {
+        render_next_shot = !render_next_shot
+        render_current_turn()
       }
     }
     function Line(x1, y1, x2, y2) {
@@ -47,11 +51,16 @@
       this.x2 = x2;
       this.y2 = y2;
     }
-    Line.prototype.drawWithArrowheads = function (ctx) {
+    Line.prototype.drawWithArrowheads = function (ctx, color) {
 
       // arbitrary styling
-      ctx.strokeStyle = "blue";
-      ctx.fillStyle = "blue";
+      if (color) {
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+      } else {
+        ctx.strokeStyle = "blue";
+        ctx.fillStyle = "blue";
+      }
       ctx.lineWidth = 1;
 
       // draw the line
@@ -67,7 +76,7 @@
 
 
     }
-    Line.prototype.drawArrowhead = function (ctx, x, y, radians) {
+    Line.prototype.drawArrowhead = function (ctx, x, y, radians, color) {
       ctx.save();
       ctx.beginPath();
       ctx.translate(x, y);
@@ -84,13 +93,13 @@
       return game_units * UNITS_PER_DIAMOND / game_data_units_per_diamond
     }
 
-    function draw_line(context, start, end) {
+    function draw_line(context, start, end, color) {
       new Line(
         convert_game_units_to_canvas_units(start[1]),
         convert_game_units_to_canvas_units(start[0]),
         convert_game_units_to_canvas_units(end[1]),
         convert_game_units_to_canvas_units(end[0]))
-        .drawWithArrowheads(context);
+        .drawWithArrowheads(context, color);
     }
 
     function render_img(context, img, x_in_diamonds, y_in_diamonds) {
@@ -192,6 +201,14 @@
       document.getElementById('spin').innerHTML = turn_data["spin"]
       document.getElementById('remaining_difficulty').innerHTML = turn_data["runout_difficulty"]
       render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
+      if (render_next_shot && current_turn != game_data["turns"].length - 1) {
+        render_ball(context, cue_ball_img, turn_data["missed_cue_ball_1"][0], turn_data["missed_cue_ball_1"][1])
+        draw_line(context, turn_data["missed_cue_ball_1"], game_data["object_balls"][turn_data["missed_1_object_ball_index"]], "blue")
+        render_ball(context, cue_ball_img, turn_data["missed_cue_ball_2"][0], turn_data["missed_cue_ball_2"][1])
+        draw_line(context, turn_data["missed_cue_ball_2"], game_data["object_balls"][turn_data["missed_1_object_ball_index"]], "blue")
+        render_ball(context, cue_ball_img, turn_data["expected_cue_ball"][0], turn_data["expected_cue_ball"][1])
+        draw_line(context, turn_data["expected_cue_ball"], game_data["object_balls"][turn_data["expected_object_ball_index"]], "brown")
+      }
       for (let i = 0; i < game_data["object_balls"].length; ++i) {
         if (sunk_object_balls.has(i)) {
           continue
@@ -209,15 +226,39 @@
           game_data["opponent_object_balls"][i][0],
           game_data["opponent_object_balls"][i][1])
       }
-      if (!sunk_object_balls.has(game_data["object_balls"].length)) {
-        render_ball(context, eight_ball_img, game_data["eight_ball"][0], game_data["eight_ball"][1])
+      draw_line(context, turn_data["cue_ball"], turn_data["path"][0], "white")
+      let object_ball
+      if (turn_data["object_ball_index"] < game_data["object_balls"].length) {
+        object_ball = game_data["object_balls"][turn_data["object_ball_index"]]
+      } else {
+        object_ball = game_data["eight_ball"]
       }
-      draw_line(context, turn_data["cue_ball"], turn_data["path"][0])
+      draw_line(context, object_ball, turn_data["pocket_coords"], object_ball_index_to_color(turn_data["object_ball_index"]))
       for (let i = 0; i < turn_data["path"].length - 1; ++i) {
-        draw_line(context, turn_data["path"][i], turn_data["path"][i + 1])
+        draw_line(context, turn_data["path"][i], turn_data["path"][i + 1], "white")
       }
     }
 
+    function object_ball_index_to_color(idx) {
+      switch (idx) {
+        case 0:
+          return "#f9e040"
+        case 1:
+          return "#3b4cb4"
+        case 2:
+          return "#f2292b"
+        case 3:
+          return "#b65299"
+        case 4:
+          return "#e49439"
+        case 5:
+          return "#007b2b"
+        case 6:
+          return "#6d373c"
+        case 7:
+          return "#000000"
+      }
+    }
     function cue_ball_to_image() {
       return 'https://pad.chalkysticks.com//image/diagrammer/balls/chalkysticks/ball-cue.svg'
     }

@@ -15,9 +15,19 @@ using json = nlohmann::json;
 
 // TODO: Extend this to python: https://docs.python.org/3/extending/building.html
 // TODO: Handle bank shots.
-// TODO: Handle side pocket shots correctly. https://billiards.colostate.edu/threads/pocket.html
-// TODO: Handle minimum distance cue ball must travel to sink an object ball for scratch purposes and other reasons.
 // TODO: Throttle raspberry pi? https://www.howtoforge.com/how-to-limit-cpu-usage-of-a-process-with-cpulimit-debian-ubuntu
+/**
+ * Represents information about the remaining runout after a shot is taken.
+ */
+struct remaining_runout_struct
+{
+  Vector2d cue_ball_location_considered;
+
+  float difficulty;
+
+  unsigned short int next_object_ball;
+};
+
 /**
  * Whether or not a shot is obstructed and whether it can become unobstructed.
  */
@@ -207,6 +217,10 @@ struct shot_angle_struct
   float fractional_distance;
   // The cue angle of the shot.
   float cut_angle_in_radians;
+  /**
+   * The minimum travel distance of a stunned cue ball after contact with the ghost ball.
+   */
+  float minimum_travel_distance_of_cue_ball;
 };
 
 /**
@@ -248,6 +262,30 @@ struct selected_shot_struct
    * Only populated if possible is true.
    */
   vector<Vector2d> path_segments;
+  /**
+   * Expected cue ball final position
+   */
+  Vector2d expected_cue_ball;
+  /**
+   * Missed cue ball position 1.
+   */
+  Vector2d missed_cue_ball_1;
+  /**
+   * Missed cue ball position 2.
+   */
+  Vector2d missed_cue_ball_2;
+  /**
+   * Expected cue ball position's next object ball shot.
+   */
+  unsigned short int expected_object_ball;
+  /**
+   * Missed cue ball position 1's next object ball shot.
+   */
+  unsigned short int missed_1_object_ball;
+  /**
+   * Missed cue ball position 2's next object ball shot.
+   */
+  unsigned short int missed_2_object_ball;
   /**
    * The next x-coordinate of the cue ball after this shot.
    * Only populated if possible is true.
@@ -1075,6 +1113,8 @@ float strength_to_distance(unsigned short int strength)
 
 /**
  * Gets the unit tangent line vector for a given cue ball, ghost ball, and pocket and other shot angle info.
+ * To calculate minimum travel distance of the cue ball, the following paper is used:
+ *   https://billiards.colostate.edu/technical_proofs/TP_3-2.pdf
  * TODO: Add this code.
   Vector2d initial = Vector2d(3, 4);
   Vector2d cue_ball_path = shot_angle.origin - initial;
@@ -1107,7 +1147,10 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
   double dot = ghost_ball_to_cue_ball.dot(ghost_ball_to_pocket);
   float negative_cos_theta = dot / (ghost_ball_to_cue_ball.norm() * ghost_ball_to_pocket.norm());
   shot_angle.cut_angle_in_radians = acos(-1 * negative_cos_theta);
-  shot_angle.fractional_distance = 1 - negative_cos_theta * negative_cos_theta;
+  float cos_squared = negative_cos_theta * negative_cos_theta;
+  float sin_squared = 1 - cos_squared;
+  shot_angle.fractional_distance = sin_squared;
+  shot_angle.minimum_travel_distance_of_cue_ball = ghost_ball_to_pocket.norm() * sin_squared / cos_squared;
   return shot_angle;
 }
 
@@ -1178,6 +1221,10 @@ void populate_shot_path_table()
               shot_path_struct &current_shot_path = shot_path_table[w][l][o][p][st][sp];
               if (!shot_info_table[w][l][o][p].possible)
               {
+                continue;
+              }
+              float distance_to_travel = shot_angle.fractional_distance * strength_to_distance(st);
+              if (distance_to_travel < shot_angle.minimum_travel_distance_of_cue_ball) {
                 continue;
               }
               current_shot_path.possible = true;
@@ -1288,6 +1335,47 @@ void populate_eight_ball_in_selected_shot_table()
   }
 }
 
+/**
+ * Gets the difficulty of the rest of the shots in the runout if the selected shot is chosen.
+ */
+remaining_runout_struct get_remaining_runout_difficulty(const shot_info_struct &current_shot_info, const shot_path_struct& current_shot_path, unsigned short int combo, set<unsigned short int> &balls, unsigned short int ball) {
+  remaining_runout_struct ret;
+  if (!current_shot_path.possible ||
+      current_shot_path.shot_obstructions.has_permanent_obstruction)
+  {
+    ret.difficulty = std::numeric_limits<float>::infinity();
+    return ret;
+  }
+  set<unsigned short int> intersect;
+  set_intersection(
+      balls.begin(),
+      balls.end(),
+      current_shot_path.shot_obstructions.obstructing_object_balls.begin(),
+      current_shot_path.shot_obstructions.obstructing_object_balls.end(),
+      std::inserter(intersect, intersect.begin()));
+  if (intersect.size() > 0)
+  {
+    ret.difficulty = std::numeric_limits<float>::infinity();
+    return ret;
+  }
+  ret.cue_ball_location_considered = current_shot_path.final_position;
+  int next_combo = combo - (1 << ball);
+  unsigned short int rounded_x = (unsigned short int)(0.5 + current_shot_path.final_position.x());
+  unsigned short int rounded_y = (unsigned short int)(0.5 + current_shot_path.final_position.y());
+  if (!selected_shot_table[rounded_x][rounded_y][next_combo].possible)
+  {
+    ret.difficulty = std::numeric_limits<float>::infinity();
+    return ret;
+  }
+  ret.next_object_ball = selected_shot_table[rounded_x][rounded_y][next_combo].object_ball;
+  ret.difficulty = selected_shot_table[rounded_x][rounded_y][next_combo].total_weighted_difficulty;
+  return ret;
+}
+
+/**
+ * This assumes that position is made 50% of the time, 25% it's shot too softly and 25% of the time it's shot too hard.
+ * In the case of the misses, the strength unit is increased by one.
+ */
 void populate_single_combination_in_selected_shot_table(int combo, set<unsigned short int> &balls)
 {
   for (auto ball : balls)
@@ -1321,33 +1409,42 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
           {
             for (unsigned short int sp = 0; sp < NUM_SPINS; ++sp)
             {
+              unsigned short int missed_strength_1;
+              if (st == 0) {
+                missed_strength_1 = 1;
+              } else {
+                missed_strength_1 = st - 1;
+              }
+              unsigned short int missed_strength_2 = st + 1;
+              if (missed_strength_2 >= NUM_STRENGTHS) {
+                missed_strength_2 = st - 2;
+              }
               shot_path_struct &current_shot_path = shot_path_table[w][l][ball][p][st][sp];
-              if (!current_shot_path.possible ||
-                  current_shot_path.shot_obstructions.has_permanent_obstruction)
-              {
+              shot_path_struct &missed_shot_path_1 = shot_path_table[w][l][ball][p][missed_strength_1][sp];
+              shot_path_struct &missed_shot_path_2 = shot_path_table[w][l][ball][p][missed_strength_2][sp];
+              remaining_runout_struct expected_shot_remaining_runout =
+                  get_remaining_runout_difficulty(current_shot_info, current_shot_path, combo, balls, ball);
+              remaining_runout_struct missed_shot_1_remaining_runout =
+                  get_remaining_runout_difficulty(current_shot_info, missed_shot_path_1, combo, balls, ball);
+              remaining_runout_struct missed_shot_2_remaining_runout =
+                  get_remaining_runout_difficulty(current_shot_info, missed_shot_path_2, combo, balls, ball);
+              if (expected_shot_remaining_runout.difficulty == std::numeric_limits<float>::infinity()) {
                 continue;
               }
-              set<unsigned short int> intersect;
-              set_intersection(
-                  balls.begin(),
-                  balls.end(),
-                  current_shot_path.shot_obstructions.obstructing_object_balls.begin(),
-                  current_shot_path.shot_obstructions.obstructing_object_balls.end(),
-                  std::inserter(intersect, intersect.begin()));
-              if (intersect.size() > 0)
-              {
+              if (missed_shot_1_remaining_runout.difficulty == std::numeric_limits<float>::infinity()) {
+                continue;
+              }
+              if (missed_shot_2_remaining_runout.difficulty == std::numeric_limits<float>::infinity()) {
                 continue;
               }
               int next_combo = combo - (1 << ball);
               unsigned short int rounded_x = (unsigned short int)(0.5 + current_shot_path.final_position.x());
               unsigned short int rounded_y = (unsigned short int)(0.5 + current_shot_path.final_position.y());
-              if (!selected_shot_table[rounded_x][rounded_y][next_combo].possible)
-              {
-                continue;
-              }
               float new_weighted_difficulty =
                   current_shot_info.weighted_difficulty +
-                  selected_shot_table[rounded_x][rounded_y][next_combo].total_weighted_difficulty;
+                  0.5 * expected_shot_remaining_runout.difficulty +
+                  0.25 * missed_shot_1_remaining_runout.difficulty +
+                  0.25 * missed_shot_2_remaining_runout.difficulty;
               if (new_weighted_difficulty < selected_shot.total_weighted_difficulty)
               {
                 selected_shot.next_combo = next_combo;
@@ -1360,6 +1457,12 @@ void populate_single_combination_in_selected_shot_table(int combo, set<unsigned 
                 selected_shot.path_segments = current_shot_path.path_segments;
                 selected_shot.next_x = rounded_x;
                 selected_shot.next_y = rounded_y;
+                selected_shot.expected_cue_ball = expected_shot_remaining_runout.cue_ball_location_considered;
+                selected_shot.missed_cue_ball_1 = missed_shot_1_remaining_runout.cue_ball_location_considered;
+                selected_shot.missed_cue_ball_2 = missed_shot_2_remaining_runout.cue_ball_location_considered;
+                selected_shot.missed_1_object_ball = missed_shot_1_remaining_runout.next_object_ball;
+                selected_shot.missed_2_object_ball = missed_shot_2_remaining_runout.next_object_ball;
+                selected_shot.expected_object_ball = expected_shot_remaining_runout.next_object_ball;
               }
             }
           }
@@ -1609,6 +1712,7 @@ string get_json_for_solution(Vector2d initial_cue_ball)
   {
     game_data["object_balls"].push_back({object_balls[o].x(), object_balls[o].y()});
   }
+  game_data["object_balls"].push_back(game_data["eight_ball"]);
   game_data["opponent_object_balls"] = {};
   for (unsigned short int o = 0; o < opponent_object_balls.size(); ++o)
   {
@@ -1625,12 +1729,20 @@ string get_json_for_solution(Vector2d initial_cue_ball)
     game_data["has_solution"] = true;
     json turn;
     turn["shot_number"] = shot_number;
-    turn["cue_ball"] = {coords.x, coords.y};
+    Vector2d fixed_cue_ball_position = move_ball_in_from_rails(Vector2d(coords.x, coords.y));
+    turn["cue_ball"] = {fixed_cue_ball_position.x(), fixed_cue_ball_position.y()};
     turn["object_ball_index"] = selected_shot.object_ball;
     turn["pocket_index"] = selected_shot.pocket;
+    turn["pocket_coords"] = {pockets[selected_shot.pocket].x(), pockets[selected_shot.pocket].y()};
     turn["runout_difficulty"] = selected_shot.total_weighted_difficulty;
     turn["strength"] = selected_shot.strength;
     turn["spin"] = selected_shot.spin;
+    turn["expected_cue_ball"] = {selected_shot.expected_cue_ball.x(), selected_shot.expected_cue_ball.y()};
+    turn["missed_cue_ball_1"] = {selected_shot.missed_cue_ball_1.x(), selected_shot.missed_cue_ball_1.y()};
+    turn["missed_cue_ball_2"] = {selected_shot.missed_cue_ball_2.x(), selected_shot.missed_cue_ball_2.y()};
+    turn["missed_1_object_ball_index"] = selected_shot.missed_1_object_ball;
+    turn["missed_2_object_ball_index"] = selected_shot.missed_2_object_ball;
+    turn["expected_object_ball_index"] = selected_shot.expected_object_ball;
 
     json path;
     for (unsigned short int i = 0; i < selected_shot.path_segments.size(); ++i)
