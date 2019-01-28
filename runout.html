@@ -177,8 +177,15 @@
     let eight_ball_img = create_img(eight_ball_to_image())
     let object_ball_imgs = []
     let opponent_object_ball_imgs = []
+    if (!game_data["opponent_object_balls"]) {
+      game_data["opponent_object_balls"] = [] // This line should not be necessary.
+    }
     for (let i = 0; i < game_data["object_balls"].length; ++i) {
-      object_ball_imgs.push(create_img(object_ball_to_image(i)))
+      if (i == game_data["object_balls"].length - 1) {
+        object_ball_imgs.push(create_img(object_ball_to_image(7)))
+      } else {
+        object_ball_imgs.push(create_img(object_ball_to_image(i)))
+      }
     }
     for (let i = 0; i < game_data["opponent_object_balls"].length; ++i) {
       opponent_object_ball_imgs.push(create_img(opponent_object_ball_to_image(i)))
@@ -190,6 +197,20 @@
       render_current_turn()
     }
 
+    function spin_string(spin) {
+      switch (spin) {
+        case 0:
+          return "Heavy draw"
+        case 1:
+          return "Light draw"
+        case 2:
+          return "Stun"
+        case 3:
+          return "Light follow"
+        case 4:
+          return "Heavy follow"
+      }
+    }
     let current_turn = 0
     function render_current_turn() {
       var context = canvas.getContext('2d')
@@ -199,7 +220,7 @@
       let turn_data = game_data["turns"][current_turn]
 
       document.getElementById('strength').innerHTML = turn_data["strength"]
-      document.getElementById('spin').innerHTML = turn_data["spin"]
+      document.getElementById('spin').innerHTML = spin_string(turn_data["spin"])
       document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
       document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)
       render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
@@ -242,6 +263,10 @@
     }
 
     function object_ball_index_to_color(idx) {
+      console.log(idx + " " + game_data["object_balls"].length)
+      if (idx == game_data["object_balls"].length - 1) {
+        return "#000000"
+      }
       switch (idx) {
         case 0:
           return "#f9e040"

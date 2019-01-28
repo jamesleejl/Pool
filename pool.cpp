@@ -13,32 +13,24 @@ int main()
 {
   auto start = std::chrono::system_clock::now();
 
-  ball_in_hand = false;
-  eight_ball = get_vector_from_ball_position_in_diamonds(1, 6);
-  cue_ball = get_vector_from_ball_position_in_diamonds(3.5, 5);
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(1, 1));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 1));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(3, 1));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 2));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(2, 3));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(0, 3));
-  object_balls.push_back(get_vector_from_ball_position_in_diamonds(4, 3));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(1, 3));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
-  opponent_object_balls.push_back(get_vector_from_ball_position_in_diamonds(2.5, 0));
+  ball_in_hand = true;
+  eight_ball = get_vector_from_ball_position_in_diamonds(3, 1);
+  cue_ball = get_vector_from_ball_position_in_diamonds(0, 5);
+  object_balls.push_back(get_vector_from_ball_position_in_diamonds(1.25, 0.5));
 
   initialize_pockets();
   initialize_table_edges();
   populate_ball_to_pocket_obstructions_table();
   populate_ghost_ball_position_table();
+  cout << "Populating shot info obstructions." << endl;
   populate_shot_info_table_obstructions();
+  cout << "Populating shot info difficulty." << endl;
   populate_shot_info_table_difficulty();
+  cout << "Populating shot path." << endl;
   populate_shot_path_table();
+  cout << "Populating shot info and path." << endl;
   populate_shot_info_and_path_table();
+  cout << "Populating selected shot." << endl;
   populate_selected_shot_table();
 
   Vector2d initial_cue_ball_position = get_cue_ball_position_for_runout();

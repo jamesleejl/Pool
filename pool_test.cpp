@@ -348,6 +348,24 @@ TEST_F(PoolTest, GetSegmentRanges)
   EXPECT_EQ(5, segment_ranges.max_y);
 }
 
+TEST_F(PoolTest, GetShotCutAngle)
+{
+  shot_angle_struct shot_angle = get_shot_angle(
+      Vector2d(0, 0),
+      Vector2d(0, 1),
+      Vector2d(0.5, 2));
+  EXPECT_FLOAT_EQ(0.46364763, shot_angle.cut_angle_in_radians);
+}
+
+TEST_F(PoolTest, GetShotCutAngleNegative)
+{
+  shot_angle_struct shot_angle = get_shot_angle(
+      Vector2d(0, 0),
+      Vector2d(0, 1),
+      Vector2d(-0.5, 2));
+  EXPECT_FLOAT_EQ(0.46364763, shot_angle.cut_angle_in_radians);
+}
+
 TEST_F(PoolTest, GetTangentLine_perpendicularToRail)
 {
   shot_angle_struct shot_angle = get_shot_angle(
@@ -541,6 +559,30 @@ TEST_F(PoolTest, PopulateShotInfoTableObstructions)
       }
     }
   }
+}
+
+TEST_F(PoolTest, RotatePointByAngle) {
+  Vector2d rotated_point = rotate_point_by_angle(
+    Vector2d(0, 0),
+    Vector2d(1, 0),
+    0.785);
+  expect_vector2d_equal(Vector2d(0.70738822, 0.7068252), rotated_point);
+}
+
+TEST_F(PoolTest, RotatePointByNegativeAngle) {
+  Vector2d rotated_point = rotate_point_by_angle(
+    Vector2d(0, 0),
+    Vector2d(1, 0),
+    -0.785);
+  expect_vector2d_equal(Vector2d(0.70738822, -0.7068252), rotated_point);
+}
+
+TEST_F(PoolTest, RotateAngledLine) {
+  Vector2d rotated_point = rotate_point_by_angle(
+    Vector2d(1, 1),
+    Vector2d(2, 2),
+    -0.785);
+  expect_vector2d_equal(Vector2d(2.4142134, 1.000563), rotated_point);
 }
 
 TEST_F(PoolTest, GetShotDifficulty_projectAngledShot)

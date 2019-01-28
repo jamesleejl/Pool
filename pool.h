@@ -206,6 +206,8 @@ struct single_rail_reflection_struct
  */
 struct shot_angle_struct
 {
+  // This is the direction away from the tangent line when follow is applied.
+  // It is also the direction from the cue ball original path to the tangent line.
   enum FollowDirection
   {
     CLOCKWISE,
@@ -221,13 +223,14 @@ struct shot_angle_struct
   Vector2d pocket_direction;
   // The proportion of the initial cue ball distance that the cue ball will travel at after contact.
   float fractional_distance;
-  // The cue angle of the shot.
+  // The cue angle of the shot. Always positive.
   float cut_angle_in_radians;
   /**
    * The minimum travel distance of a stunned cue ball after contact with the ghost ball.
    */
   float minimum_travel_distance_of_cue_ball;
-  Vector2d cue_ball_to_ghost_ball;
+  // This is a unit vector.
+  Vector2d ghost_ball_to_cue_ball_direction;
 };
 
 /**
@@ -725,8 +728,8 @@ ghost_ball_struct get_ghost_ball_for_shot(const Vector2d &ball, const Vector2d &
   ghost_ball_struct ghost_ball;
   Vector2d pocket_to_ball = ball - pocket;
   ghost_ball.coords = ball + pocket_to_ball.normalized() * BALL_DIAMETER;
-  if (ghost_ball.coords.x() < 0 || ghost_ball.coords.x() > WIDTH ||
-      ghost_ball.coords.y() < 0 || ghost_ball.coords.y() > LENGTH)
+  if (ghost_ball.coords.x() < left_edge[0].x() || ghost_ball.coords.x() > right_edge[0].x() ||
+      ghost_ball.coords.y() < bottom_edge[0].y() || ghost_ball.coords.y() > top_edge[0].y())
   {
     return ghost_ball;
   }
@@ -858,18 +861,22 @@ Vector2d get_vector_from_center_of_pocket(unsigned short int pocket_index)
 float get_shot_difficulty(const Vector2d &cue_ball, const Vector2d &ghost_ball, unsigned short int pocket_index)
 {
   Vector2d vector_from_center_of_pocket = get_vector_from_center_of_pocket(pocket_index);
+  // This could technically be zero but leads to ball in hand putting the cue ball on the ghost ball.
   if (cue_ball == ghost_ball)
   {
-    return 0;
+    return std::numeric_limits<float>::infinity();
   }
   Vector2d pocket = pockets[pocket_index];
   Vector2d ghost_ball_to_pocket = pocket - ghost_ball;
   Vector2d pocket_to_ghost_ball = -1 * ghost_ball_to_pocket;
-  // Equal to the inverse of the cosine of the angle of the shot.
-  float difficulty_scaling_factor_due_to_angle =
-      (pocket_to_ghost_ball.norm() * vector_from_center_of_pocket.norm()) /
-      pocket_to_ghost_ball.dot(vector_from_center_of_pocket);
+  // Equal to the inverse of the cosine of the angle of the shot. Always returns a positive value.
+  float angle = fabs(acos(pocket_to_ghost_ball.dot(vector_from_center_of_pocket) / (pocket_to_ghost_ball.norm() * vector_from_center_of_pocket.norm())));
+  float difficulty_scaling_factor_due_to_angle = 1/cos(angle * 3/2);
   Vector2d ghost_ball_to_cue_ball = cue_ball - ghost_ball;
+  // The shot becomes difficulty if the cue ball is too close to the ghost ball.
+  if (ghost_ball_to_cue_ball.norm() < BALL_RADIUS) {
+    return std::numeric_limits<float>::infinity();
+  }
   float projected_distance_of_cue_ball_to_shot_line =
       ghost_ball_to_cue_ball.squaredNorm() * ghost_ball_to_pocket.norm() /
       ghost_ball_to_pocket.dot(ghost_ball_to_cue_ball);
@@ -1061,6 +1068,9 @@ single_rail_reflection_struct reflect_ball_path_off_single_table_edge(
 
   float start_to_rail_length = (rail_reflection.intersection_point - segment_start).norm();
   float rail_to_end_length = segment_length - start_to_rail_length;
+  if (rail_to_end_length < 0) {
+    rail_to_end_length = 0; // Should not need to be here.
+  }
   rail_reflection.end_point = rail_reflection.intersection_point + rail_to_end_length * direction_of_final_vector;
   rail_reflection.distance_traveled_after_rail = rail_to_end_length;
   return rail_reflection;
@@ -1150,7 +1160,7 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
   float sin_squared = 1 - cos_squared;
   shot_angle.fractional_distance = sin_squared;
   shot_angle.minimum_travel_distance_of_cue_ball = ghost_ball_to_pocket.norm() * sin_squared / cos_squared;
-  shot_angle.cue_ball_to_ghost_ball = -1 * ghost_ball_to_cue_ball;
+  shot_angle.ghost_ball_to_cue_ball_direction = ghost_ball_to_cue_ball.normalized();
   return shot_angle;
 }
 
@@ -1160,7 +1170,7 @@ shot_angle_struct get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost
 float estimate_draw_angle_from_cut_angle(float cut_angle) {
   if (cut_angle < 0.349) {
     return cut_angle * 4;
-  } else if (cut_angle < 40) {
+  } else if (cut_angle < 0.698132) {
     return cut_angle * 3;
   } else {
     return 4 * cut_angle / 3 + 1.047;
@@ -1174,16 +1184,21 @@ float estimate_follow_angle_from_cut_angle(float cut_angle) {
   if (cut_angle < 0.253) {
     return cut_angle * 3;
   } else if (cut_angle < 0.848) {
-    return cut_angle * 0.611;
+    return 0.611;
   } else {
-    float ret = 1.1 - cut_angle;
-    if (ret < 0) {
-      return 0;
-    }
-    return ret;
+    return (1.5707 - cut_angle) / 2; // This is particularly hacky.
   }
 }
 
+// From https://gamedev.stackexchange.com/questions/121478/how-to-rotate-a-2d-line.
+// Rotates it counter clockwise for positive angles.
+Vector2d rotate_point_by_angle(Vector2d origin, Vector2d point_to_rotate, float angle_in_radians) {
+  float dx = point_to_rotate.x() - origin.x();
+  float dy = point_to_rotate.y() - origin.y();
+  float nx = dx * cos(angle_in_radians) - dy * sin(angle_in_radians) + origin.x();
+  float ny = dx * sin(angle_in_radians) + dy * cos(angle_in_radians) + origin.y();
+  return Vector2d(nx, ny);
+}
 /**
  * Gets the path given the shot angle info, a strength, and a spin.
  * Relies on pockets and table edges being populated.
@@ -1193,8 +1208,33 @@ float estimate_follow_angle_from_cut_angle(float cut_angle) {
 vector<Vector2d> get_path(shot_angle_struct shot_angle, unsigned short int strength, unsigned short int spin)
 {
   vector<Vector2d> ret;
-  float distance_to_travel = shot_angle.fractional_distance * strength_to_distance(strength);
-  Vector2d cue_ball_destination = shot_angle.tangent_line_direction * distance_to_travel + shot_angle.origin;
+  float str_to_dist = strength_to_distance(strength);
+  float distance_to_travel = shot_angle.fractional_distance * str_to_dist;
+
+  Vector2d unit_vector_to_travel_along;
+  if (spin == 2) {
+    unit_vector_to_travel_along = shot_angle.tangent_line_direction;
+  } else if (spin == 3 || spin == 4) {
+    // This is the angle deviated away from the original cue ball travel line.
+    float angle_of_travel = estimate_follow_angle_from_cut_angle(shot_angle.cut_angle_in_radians);
+    if (spin == 3 && str_to_dist / UNITS_PER_DIAMOND > 14) {
+      angle_of_travel = (1.5708 + angle_of_travel - shot_angle.cut_angle_in_radians) / 2;
+    }
+    if (shot_angle.follow_direction == shot_angle_struct::COUNTER_CLOCKWISE) {
+      angle_of_travel *= -1;
+    }
+    unit_vector_to_travel_along = rotate_point_by_angle(Vector2d(0, 0), -1 * shot_angle.ghost_ball_to_cue_ball_direction, angle_of_travel);
+  } else if (spin == 0 || spin == 1) {
+    float angle_of_travel = estimate_draw_angle_from_cut_angle(shot_angle.cut_angle_in_radians);
+    if (spin == 1) {
+      angle_of_travel = (1.5708 + angle_of_travel + shot_angle.cut_angle_in_radians) / 2;
+    }
+    if (shot_angle.follow_direction == shot_angle_struct::CLOCKWISE) {
+      angle_of_travel *= -1;
+    }
+    unit_vector_to_travel_along = rotate_point_by_angle(Vector2d(0, 0), shot_angle.ghost_ball_to_cue_ball_direction, angle_of_travel);
+  }
+  Vector2d cue_ball_destination = unit_vector_to_travel_along * distance_to_travel + shot_angle.origin;
   Vector2d cue_ball_location = shot_angle.origin;
   ret.push_back(cue_ball_location);
   single_rail_reflection_struct rail_reflection = reflect_ball_path_off_single_table_edge(
