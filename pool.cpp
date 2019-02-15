@@ -67,7 +67,23 @@ string get_json_for_solution()
   }
   do
   {
+    // TODO: Hacky
+    short coords_x = coords.get_x();
+    if (coords_x < 0) {
+      coords_x = 0;
+    } else if (coords_x > LENGTH) {
+      coords_x = LENGTH;
+    }
+    short coords_y = coords.get_y();
+    if (coords_y < 0) {
+      coords_y = 0;
+    } else if (coords_y > WIDTH) {
+      coords_y = WIDTH;
+    }
+    coords = Coordinates(coords_x, coords_y);
+    cout << coords.get_x() << " " << coords.get_y() << " " << combo << endl;
     SelectedShot selected_shot = selected_shot_table[coords.get_x()][coords.get_y()][combo];
+    cout << "HERE" << endl;
     if (!selected_shot.get_possible())
     {
       return game_data.dump();
@@ -165,7 +181,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<short> &b
 {
   for (auto ball : balls)
   {
-    int next_combo = combo - (1 << ball);
+    int next_combo = combo - (1 << (ball - 1));
     for (unsigned short l = 0; l <= LENGTH; ++l)
     {
       for (unsigned short w = 0; w <= WIDTH; ++w)
