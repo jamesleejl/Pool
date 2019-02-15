@@ -181,16 +181,15 @@ void populate_single_combination_in_selected_shot_table(int combo, set<short> &b
               if (!post_shot.get_possible()) {
                 continue;
               }
-              set<unsigned short int> current_player_balls_intersecting_shot;
               const set<short>& obstructing_player_balls = post_shot.get_obstructions().get_obstructing_player_balls();
-              set_intersection(
-                  balls.begin(),
-                  balls.end(),
-                  obstructing_player_balls.begin(),
-                  obstructing_player_balls.end(),
-                  std::inserter(current_player_balls_intersecting_shot, current_player_balls_intersecting_shot.begin()));
-              if (current_player_balls_intersecting_shot.size() > 0)
-              {
+              bool has_obstruction = false;
+              for (auto ball : balls) {
+                if (obstructing_player_balls.find(ball) != obstructing_player_balls.end()) {
+                  has_obstruction = true;
+                  break;
+                }
+              }
+              if (has_obstruction) {
                 continue;
               }
               Vector2d expected_cue_ball_position = post_shot.get_final_position();
@@ -263,6 +262,7 @@ set<short> get_set_from_combination(int n, int combo) {
  */
 void process_object_ball_combination(int num_object_balls, int combo)
 {
+  cout << combo << endl;
   set<short> balls = get_set_from_combination(num_object_balls, combo);
   populate_single_combination_in_selected_shot_table(combo, balls);
 }
