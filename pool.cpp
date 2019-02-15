@@ -56,12 +56,12 @@ string get_json_for_solution()
   game_data["turns"] = {};
   game_data["has_solution"] = false;
   game_data["object_balls"].push_back(game_data["eight_ball"]);
-  for (short o = 0; o < player_balls_without_eight_ball.size(); ++o)
+  for (unsigned short o = 0; o < player_balls_without_eight_ball.size(); ++o)
   {
     game_data["object_balls"].push_back({to_diamonds(player_balls_without_eight_ball[o].x()), to_diamonds(player_balls_without_eight_ball[o].y())});
   }
   game_data["opponent_object_balls"] = {};
-  for (short o = 0; o < opponent_balls.size(); ++o)
+  for (unsigned short o = 0; o < opponent_balls.size(); ++o)
   {
     game_data["opponent_object_balls"].push_back({to_diamonds(opponent_balls[o].x()), to_diamonds(opponent_balls[o].y())});
   }
@@ -86,7 +86,7 @@ string get_json_for_solution()
     turn["spin"] = selected_shot.get_spin();
 
     json path;
-    for (short i = 0; i < selected_shot.get_cue_ball_path().size(); ++i)
+    for (unsigned short i = 0; i < selected_shot.get_cue_ball_path().size(); ++i)
     {
       path.push_back({to_diamonds(selected_shot.get_cue_ball_path()[i].x()), to_diamonds(selected_shot.get_cue_ball_path()[i].y())});
     }
@@ -107,16 +107,16 @@ string get_json_for_solution()
 // TODO: Test.
 void populate_eight_ball_in_selected_shot_table()
 {
-  for (short l = 0; l <= LENGTH; ++l)
+  for (unsigned short l = 0; l <= LENGTH; ++l)
   {
-    for (short w = 0; w <= WIDTH; ++w)
+    for (unsigned short w = 0; w <= WIDTH; ++w)
     {
       SelectedShot &selected_shot = selected_shot_table[l][w][0];
-      for (short p = 0; p < pockets.size(); ++p)
+      for (unsigned short p = 0; p < pockets.size(); ++p)
       {
-        for (short st = 0; st < NUM_STRENGTHS; ++st)
+        for (unsigned short st = 0; st < NUM_STRENGTHS; ++st)
         {
-          for (short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
+          for (unsigned short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
           {
             PostShot &post_shot = post_shot_table[l][w][eight_ball_index()][p][st][sp];
             if (!post_shot.get_possible())
@@ -166,16 +166,16 @@ void populate_single_combination_in_selected_shot_table(int combo, set<short> &b
   for (auto ball : balls)
   {
     int next_combo = combo - (1 << ball);
-    for (short l = 0; l <= LENGTH; ++l)
+    for (unsigned short l = 0; l <= LENGTH; ++l)
     {
-      for (short w = 0; w <= WIDTH; ++w)
+      for (unsigned short w = 0; w <= WIDTH; ++w)
       {
         SelectedShot &selected_shot = selected_shot_table[l][w][combo];
-        for (short p = 0; p < pockets.size(); ++p)
+        for (unsigned short p = 0; p < pockets.size(); ++p)
         {
-          for (short st = 0; st < NUM_STRENGTHS; ++st)
+          for (unsigned short st = 0; st < NUM_STRENGTHS; ++st)
           {
-            for (short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
+            for (unsigned short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
             {
               PostShot &post_shot = post_shot_table[l][w][ball][p][st][sp];
               if (!post_shot.get_possible()) {
@@ -288,7 +288,7 @@ void process_object_ball_combinations(int num_object_balls, int num_elements)
 {
   vector<int> object_ball_combinations =
     generate_all_combinations(num_object_balls, num_elements);
-  for (int combo : object_ball_combinations) {
+  for (unsigned int combo : object_ball_combinations) {
     process_object_ball_combination(num_object_balls, combo);
   }
 }
@@ -304,7 +304,7 @@ void populate_selected_shot_table()
       LENGTH + 1, vector<vector<SelectedShot>>(
         WIDTH + 1, vector<SelectedShot>((int)pow(2, player_balls_without_eight_ball.size()))));
   populate_eight_ball_in_selected_shot_table();
-  for (short i = 1; i <= player_balls_without_eight_ball.size(); ++i)
+  for (unsigned short i = 1; i <= player_balls_without_eight_ball.size(); ++i)
   {
     process_object_ball_combinations(player_balls_without_eight_ball.size(), i);
   }
@@ -317,7 +317,7 @@ vector<Vector2d> get_path_with_reflections(vector<Vector2d> path) {
   vector<Vector2d> path_with_reflections;
   Vector2d start = path[0];
   path_with_reflections.push_back(start);
-  for (int i = 1; i < path.size(); ++i) {
+  for (unsigned int i = 1; i < path.size(); ++i) {
     Vector2d end = path[i];
     do {
       RailIntersection rail_intersection = get_rail_intersection(start, end);
@@ -328,7 +328,7 @@ vector<Vector2d> get_path_with_reflections(vector<Vector2d> path) {
       start = rail_intersection.get_intersection_point();
       path_with_reflections.push_back(start);
       end = apply_reflection(end, rail_intersection.get_intersection_edge());
-      for (int j = i + 1; j < path.size(); ++j) {
+      for (unsigned int j = i + 1; j < path.size(); ++j) {
         path[j] = apply_reflection(path[j], rail_intersection.get_intersection_edge());
       }
    } while (true);
@@ -347,6 +347,7 @@ Vector2d apply_reflection(Vector2d point, Edge edge) {
     case TOP:
       return Vector2d(point.x(), top_edge[0].y() * 2 - point.y());
   }
+  return Vector2d(-1, -1);
 }
 
 RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
@@ -507,18 +508,18 @@ void populate_post_shot_table()
             pockets.size(), vector<vector<PostShot>>(
               NUM_STRENGTHS, vector<PostShot>(
                 Spin::MAX_NUM_SPINS))))));
-  for (short l = 0; l <= LENGTH; ++l)
+  for (unsigned short l = 0; l <= LENGTH; ++l)
   {
-    for (short w = 0; w <= WIDTH; ++w)
+    for (unsigned short w = 0; w <= WIDTH; ++w)
     {
-      for (short o = 0; o < player_balls.size(); ++o)
+      for (unsigned short o = 0; o < player_balls.size(); ++o)
       {
-        for (short p = 0; p < pockets.size(); ++p)
+        for (unsigned short p = 0; p < pockets.size(); ++p)
         {
           const Shot &shot = shot_table[l][w][o][p];
-          for (short st = 0; st < NUM_STRENGTHS; ++st)
+          for (unsigned short st = 0; st < NUM_STRENGTHS; ++st)
           {
-            for (short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
+            for (unsigned short sp = 0; sp < Spin::MAX_NUM_SPINS; ++sp)
             {
               PostShot &post_shot = post_shot_table[l][w][o][p][st][sp];
               post_shot.set_possible();
@@ -531,7 +532,7 @@ void populate_post_shot_table()
               post_shot.set_speed_type(speed_to_speed_type(strength_to_speed(st)));
               vector<Vector2d> cue_ball_path = get_path_with_reflections(get_cue_ball_path(shot, st, (Spin) sp));
               post_shot.set_cue_ball_path(cue_ball_path);
-              for (int i = 1; i < cue_ball_path.size(); ++i) {
+              for (unsigned int i = 1; i < cue_ball_path.size(); ++i) {
                 BallObstructions cue_ball_path_obstructions =
                   get_obstructions_on_ball_path_for_ball_index(o, cue_ball_path[i - 1], cue_ball_path[i], true);
                 if (cue_ball_path_obstructions.get_has_permanent_obstruction())
@@ -648,13 +649,13 @@ double get_shot_difficulty(const Vector2d &cue_ball, const Vector2d &ghost_ball,
 
 void populate_shot_table_difficulty()
 {
-  for (short o = 0; o < player_balls.size(); ++o)
+  for (unsigned short o = 0; o < player_balls.size(); ++o)
   {
-    for (short p = 0; p < pockets.size(); ++p)
+    for (unsigned short p = 0; p < pockets.size(); ++p)
     {
-      for (short l = 0; l <= LENGTH; ++l)
+      for (unsigned short l = 0; l <= LENGTH; ++l)
       {
-        for (short w = 0; w <= WIDTH; ++w)
+        for (unsigned short w = 0; w <= WIDTH; ++w)
         {
           Shot &shot = shot_table[l][w][o][p];
           const GhostBall& ghost_ball = *shot.get_ghost_ball();
@@ -704,15 +705,15 @@ void populate_shot_table_obstructions()
           LENGTH + 1, vector<vector<vector<Shot>>>(
               WIDTH + 1, vector<vector<Shot>>(
                   player_balls.size(), vector<Shot>(pockets.size()))));
-  for (short o = 0; o < player_balls.size(); ++o)
+  for (unsigned short o = 0; o < player_balls.size(); ++o)
   {
-    for (short p = 0; p < pockets.size(); ++p)
+    for (unsigned short p = 0; p < pockets.size(); ++p)
     {
       const BallObstructions& player_ball_to_pocket_obstructions = player_ball_to_pocket_obstructions_table[o][p];
       const GhostBall* ghost_ball_ptr = &ghost_ball_position_table[o][p];
-      for (short l = 0; l <= LENGTH; ++l)
+      for (unsigned short l = 0; l <= LENGTH; ++l)
       {
-        for (short w = 0; w <= WIDTH; ++w)
+        for (unsigned short w = 0; w <= WIDTH; ++w)
         {
           Shot &shot = shot_table[l][w][o][p];
           shot.set_possible();
@@ -765,9 +766,9 @@ void populate_ghost_ball_position_table()
 {
   ghost_ball_position_table =
       vector<vector<GhostBall>>(player_balls.size(), vector<GhostBall>(pockets.size()));
-  for (short p = 0; p < pockets.size(); ++p)
+  for (unsigned short p = 0; p < pockets.size(); ++p)
   {
-    for (short o = 0; o < player_balls.size(); ++o)
+    for (unsigned short o = 0; o < player_balls.size(); ++o)
     {
       ghost_ball_position_table[o][p] = get_ghost_ball_for_shot(player_balls[o], pockets[p]);
     }
@@ -856,7 +857,7 @@ BallObstructions get_obstructions_on_ball_path_for_ball_index(
     bool is_cue_ball_after_contact)
 {
   BallObstructions obstructions;
-  for (short o = 0; o < opponent_balls.size(); ++o)
+  for (unsigned short o = 0; o < opponent_balls.size(); ++o)
   {
     if (get_ball_intersects_ball_path(opponent_balls[o], ball_path_start, ball_path_end))
     {
@@ -873,7 +874,7 @@ BallObstructions get_obstructions_on_ball_path_for_ball_index(
   }
   if (is_cue_ball_after_contact)
   {
-    for (short p = 0; p < pockets.size(); ++p)
+    for (unsigned short p = 0; p < pockets.size(); ++p)
     {
       if (get_ball_intersects_ball_path(pockets[p].get_position(), ball_path_start, ball_path_end))
       {
@@ -891,7 +892,7 @@ BallObstructions get_obstructions_on_ball_path_for_ball_index(
     obstructions.set_has_permanent_obstruction();
     return obstructions;
   }
-  for (short i = 0; i < player_balls.size(); ++i)
+  for (unsigned short i = 0; i < player_balls.size(); ++i)
   {
     if (i == object_ball_index)
     {
@@ -913,10 +914,10 @@ void populate_player_ball_to_pocket_obstructions_table()
 {
   player_ball_to_pocket_obstructions_table =
       vector<vector<BallObstructions>>(player_balls.size(), vector<BallObstructions>(pockets.size()));
-  for (short p = 0; p < pockets.size(); ++p)
+  for (unsigned short p = 0; p < pockets.size(); ++p)
   {
     const Vector2d& pocket = pockets[p].get_position();
-    for (short b = 0; b < player_balls.size(); ++b)
+    for (unsigned short b = 0; b < player_balls.size(); ++b)
     {
       player_ball_to_pocket_obstructions_table[b][p] =
           get_obstructions_on_ball_path_for_ball_index(
