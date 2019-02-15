@@ -7,61 +7,151 @@
       margin: 0px;
       padding: 0px;
     }
+    .pool_table {
+      width: 900px;
+      height: 500px;
+      margin-bottom: 30px;
+    }
+    .pool_table_img {
+      position: absolute;
+      opacity: 0.7;
+      width: 898px;
+      height: 496px;
+    }
+    .canvas {
+      position: absolute;
+      top: 48px;
+      left: 59px;
+      width: 800px;
+      height: 400px;
+    }
+    .main {
+      margin-left: 10px;
+    }
   </style>
 
 </head>
 
 <body>
   <div id="ball_in_hand" />
-  <div id="pool_table" style="float: left; width: 1000px;height:604px;">
-    <img style="position:absolute; opacity: 0.7" width="899" height="499" src="http://corksandcleaver.com/v/2017/02/billiard-table-sizes-billiard-tables-billiards-table-dimensions-billiard-table-parts-billiard-table-felt-billiard-table-clearance-billiard-table-repair-carom-billiard-table-billiard-tables.png" />
-    <canvas style="position:absolute; top: 48px; left: 48px" id="canvas" width="800" height="400" z-index="-1" />
-  </div>
-  <div style="width: 300px; float: left">
-    <div>Use left and right arrow keys to change turns.</div>
-    <div>Shot Difficulty: <span id="shot_difficulty"></span></div>
-    <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
-    <div>Strength: <span id="strength"></span></div>
-    <div>Spin: <span id="spin"></span></div>
+  <div class="main">
+    <div id="pool_table" class="pool_table">
+      <img class="pool_table_img"
+           src="http://corksandcleaver.com/v/2017/02/billiard-table-sizes-billiard-tables-billiards-table-dimensions-billiard-table-parts-billiard-table-felt-billiard-table-clearance-billiard-table-repair-carom-billiard-table-billiard-tables.png" />
+      <canvas class="canvas" id="canvas" width="800" height="400" z-index="-1" />
+    </div>
+    <div class="shot_info">
+      <div>Use left and right arrow keys to select shots.</div>
+      <div>Shot Difficulty: <span id="shot_difficulty"></span></div>
+      <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
+      <div>Strength: <span id="strength"></span></div>
+      <div>Spin: <span id="spin"></span></div>
+    </div>
   </div>
   <script src="game_data.js"></script>
   <script>
-    BALL_RADIUS_IN_DIAMONDS = 0.09
-    // TODO: Is this extra parameter necessary?
-    EXTRA_OFFSET_IN_DIAMONDS = 0.1
+    // Constants and variables ------------------------------------------------------
 
-    document.onkeydown = checkKey
+    /** The radius of a pool ball in terms of diamonds. */
+    BALL_RADIUS_IN_DIAMONDS = 0.09
+
+    /**
+     * CANVAS_HEIGHT and CANVAS_WIDTH give the units of the canvas when rendering. That is, to render in the bottom
+     * left corner of the canvas, we draw at (0, 0). To render at the top right corner of the canvas, we draw at
+     * (CANVAS_WIDTH, CANVAS_HEIGHT).
+     */
+    /** The number of units high the canvas is. */
+    CANVAS_HEIGHT = 400
+    /** The number of units wide the canvas is. */
+    CANVAS_WIDTH = 2 * CANVAS_HEIGHT
+    /** The number of units per diamond. */
+    UNITS_PER_DIAMOND = CANVAS_HEIGHT / 4
+
+    let canvas = document.getElementById('canvas');
+    let sunk_object_balls = new Set()
+
+    let pockets = [
+      [0, 0],
+      [UNITS_PER_DIAMOND * 4, 0],
+      [UNITS_PER_DIAMOND * 8, 0],
+      [0, UNITS_PER_DIAMOND * 4],
+      [UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4],
+      [UNITS_PER_DIAMOND * 8, UNITS_PER_DIAMOND * 4]
+    ]
+
+    var promiseArray = []
+
+    let cue_ball_img = create_img(cue_ball_to_image())
+    let object_ball_imgs = []
+    let opponent_object_ball_imgs = []
+    let current_turn = 0
+    let context;
+    // TODO: This is hacky.
+    let flipped = false
+
     render_next_shot = false
 
-    function checkKey(e) {
+    // Handle key press -------------------------------------------------------------
+    document.onkeydown = handleKeyPress
+
+    function handleKeyPress(e) {
       e = e || window.event;
 
+      // Left arrow.
       if (e.keyCode == '37') {
         previous_turn();
       }
+      // Right arrow.
       else if (e.keyCode == '39') {
         next_turn();
+      // 't'
       } else if (e.keyCode == '84') {
         render_next_shot = !render_next_shot
         render_current_turn()
       }
     }
+
+    // Line ---------------------------------------------------------------------------
+    /**
+     * Represents a line through (x1, y1) to (x2, y2).
+     * @param {number} x1 the x coordinate of the start point.
+     * @param {number} y1 the y coordinate of the start point.
+     * @param {number} x2 the x coordinate of the end point.
+     * @param {number} y2 the y coordinate of the end point.
+     */
     function Line(x1, y1, x2, y2) {
       this.x1 = x1;
       this.y1 = y1;
       this.x2 = x2;
       this.y2 = y2;
     }
-    Line.prototype.drawWithArrowheads = function (ctx, color) {
 
-      // arbitrary styling
-      if (color) {
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
-      } else {
-        ctx.strokeStyle = "blue";
-        ctx.fillStyle = "blue";
-      }
+    /**
+     * Draws the arrow head representing the direction of the line.
+     * @param {array<number>} start an array of length two representing the start coordinates.
+     * @param {array<number>} end an array of length two representing the end coordinates.
+     * @param {string} color the html string representing the color of the line.
+     */
+    Line.prototype.drawArrowhead = function (ctx, x, y, radians, color) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.translate(x, y);
+      ctx.rotate(radians);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(4, 10);
+      ctx.lineTo(-4, 10);
+      ctx.closePath();
+      ctx.restore();
+      ctx.fill();
+    }
+
+    /**
+     * Draws the line represented by this object with the given color.
+     * @param {string} color the html string representing the color of the line.
+     */
+    Line.prototype.drawWithArrowheads = function (ctx, color) {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
       ctx.lineWidth = 1;
 
       // draw the line
@@ -74,44 +164,37 @@
       var endRadians = Math.atan((this.y2 - this.y1) / (this.x2 - this.x1));
       endRadians += ((this.x2 > this.x1) ? 90 : -90) * Math.PI / 180;
       this.drawArrowhead(ctx, this.x2, this.y2, endRadians);
-
-
-    }
-    Line.prototype.drawArrowhead = function (ctx, x, y, radians, color) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.translate(x, y);
-      ctx.rotate(radians);
-      ctx.moveTo(0, 0);
-      ctx.lineTo(5, 20);
-      ctx.lineTo(-5, 20);
-      ctx.closePath();
-      ctx.restore();
-      ctx.fill();
     }
 
-    function convert_game_units_to_canvas_units(game_units) {
-      return game_units * UNITS_PER_DIAMOND / game_data_units_per_diamond
-    }
-
+    /**
+     * Draws a line with arrowhead pointing to end from start to end with the given color. Coordinates in units.
+     * @param {array<number>} start an array of length two representing the start coordinates.
+     * @param {array<number>} end an array of length two representing the end coordinates.
+     * @param {string} color the html string representing the color of the line.
+     */
     function draw_line(context, start, end, color) {
       new Line(
-        convert_game_units_to_canvas_units(start[1]),
-        convert_game_units_to_canvas_units(start[0]),
-        convert_game_units_to_canvas_units(end[1]),
-        convert_game_units_to_canvas_units(end[0]))
-        .drawWithArrowheads(context, color);
+        convert_diamonds_to_canvas_units(start[0]),
+        convert_diamonds_to_canvas_units(start[1]),
+        convert_diamonds_to_canvas_units(end[0]),
+        convert_diamonds_to_canvas_units(end[1]))
+          .drawWithArrowheads(context, color);
+    }
+
+    // -------------------------------------------
+    function convert_diamonds_to_canvas_units(diamonds) {
+      return diamonds * UNITS_PER_DIAMOND
     }
 
     function render_img(context, img, x_in_diamonds, y_in_diamonds) {
       context.drawImage(
         img,
-        convert_game_units_to_canvas_units(y_in_diamonds),
-        convert_game_units_to_canvas_units(x_in_diamonds))
+        convert_diamonds_to_canvas_units(x_in_diamonds),
+        convert_diamonds_to_canvas_units(y_in_diamonds))
     }
 
     function render_ball(context, img, x_in_diamonds, y_in_diamonds) {
-      render_img(context, img, x_in_diamonds - BALL_RADIUS_IN_DIAMONDS - EXTRA_OFFSET_IN_DIAMONDS, y_in_diamonds - BALL_RADIUS_IN_DIAMONDS - EXTRA_OFFSET_IN_DIAMONDS)
+      render_img(context, img, x_in_diamonds - BALL_RADIUS_IN_DIAMONDS, y_in_diamonds - BALL_RADIUS_IN_DIAMONDS)
     }
 
     function add_to_sunk_object_balls(object_ball) {
@@ -153,39 +236,10 @@
       return img
     }
 
-    CANVAS_HEIGHT = 400
-    CANVAS_WIDTH = 2 * CANVAS_HEIGHT
-    UNITS_PER_DIAMOND = CANVAS_HEIGHT / 4
-    BALL_OFFSET = 10
-
-    let canvas = document.getElementById('canvas');
-    let sunk_object_balls = new Set()
-
-    let pockets = [
-      [0, 0],
-      [UNITS_PER_DIAMOND * 4, 0],
-      [0, UNITS_PER_DIAMOND * 4],
-      [UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 4],
-      [0, UNITS_PER_DIAMOND * 8],
-      [UNITS_PER_DIAMOND * 4, UNITS_PER_DIAMOND * 8]
-    ]
-
-    var promiseArray = []
-
-    let game_data_units_per_diamond = game_data["units_per_diamond"]
-    let cue_ball_img = create_img(cue_ball_to_image())
-    let eight_ball_img = create_img(eight_ball_to_image())
-    let object_ball_imgs = []
-    let opponent_object_ball_imgs = []
-    if (!game_data["opponent_object_balls"]) {
-      game_data["opponent_object_balls"] = [] // This line should not be necessary.
-    }
     for (let i = 0; i < game_data["object_balls"].length; ++i) {
-      if (i == game_data["object_balls"].length - 1) {
-        object_ball_imgs.push(create_img(object_ball_to_image(7)))
-      } else {
-        object_ball_imgs.push(create_img(object_ball_to_image(i)))
-      }
+      object_ball_imgs.push(create_img(object_ball_to_image(i)))
+      console.log(i)
+      console.log(object_ball_imgs[i])
     }
     for (let i = 0; i < game_data["opponent_object_balls"].length; ++i) {
       opponent_object_ball_imgs.push(create_img(opponent_object_ball_to_image(i)))
@@ -211,12 +265,15 @@
           return "Heavy follow"
       }
     }
-    let current_turn = 0
     function render_current_turn() {
-      var context = canvas.getContext('2d')
+      context = canvas.getContext('2d')
+      if (!flipped) {
+        context.transform(1, 0, 0, -1, 0, canvas.height)
+        flipped = true
+      }
+
       // clear
       context.clearRect(0, 0, canvas.width, canvas.height)
-
       let turn_data = game_data["turns"][current_turn]
 
       document.getElementById('strength').innerHTML = turn_data["strength"]
@@ -224,14 +281,6 @@
       document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
       document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)
       render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
-      if (render_next_shot && current_turn != game_data["turns"].length - 1) {
-        render_ball(context, cue_ball_img, turn_data["missed_cue_ball_1"][0], turn_data["missed_cue_ball_1"][1])
-        draw_line(context, turn_data["missed_cue_ball_1"], game_data["object_balls"][turn_data["missed_1_object_ball_index"]], "blue")
-        render_ball(context, cue_ball_img, turn_data["missed_cue_ball_2"][0], turn_data["missed_cue_ball_2"][1])
-        draw_line(context, turn_data["missed_cue_ball_2"], game_data["object_balls"][turn_data["missed_1_object_ball_index"]], "blue")
-        render_ball(context, cue_ball_img, turn_data["expected_cue_ball"][0], turn_data["expected_cue_ball"][1])
-        draw_line(context, turn_data["expected_cue_ball"], game_data["object_balls"][turn_data["expected_object_ball_index"]], "brown")
-      }
       for (let i = 0; i < game_data["object_balls"].length; ++i) {
         if (sunk_object_balls.has(i)) {
           continue
@@ -250,12 +299,7 @@
           game_data["opponent_object_balls"][i][1])
       }
       draw_line(context, turn_data["cue_ball"], turn_data["path"][0], "white")
-      let object_ball
-      if (turn_data["object_ball_index"] < game_data["object_balls"].length) {
-        object_ball = game_data["object_balls"][turn_data["object_ball_index"]]
-      } else {
-        object_ball = game_data["eight_ball"]
-      }
+      let object_ball = game_data["object_balls"][turn_data["object_ball_index"]]
       draw_line(context, object_ball, turn_data["pocket_coords"], object_ball_index_to_color(turn_data["object_ball_index"]))
       for (let i = 0; i < turn_data["path"].length - 1; ++i) {
         draw_line(context, turn_data["path"][i], turn_data["path"][i + 1], "white")
@@ -263,7 +307,6 @@
     }
 
     function object_ball_index_to_color(idx) {
-      console.log(idx + " " + game_data["object_balls"].length)
       if (idx == game_data["object_balls"].length - 1) {
         return "#000000"
       }
@@ -299,7 +342,10 @@
     }
 
     function object_ball_to_image(ball_index) {
-      return 'https://pad.chalkysticks.com//image/diagrammer/balls/chalkysticks/ball-' + (ball_index + 1) + '.svg'
+      if (ball_index == 0) {
+        return eight_ball_to_image();
+      }
+      return 'https://pad.chalkysticks.com//image/diagrammer/balls/chalkysticks/ball-' + ball_index + '.svg'
     }
 
     function Ball(x, y) {
