@@ -12,11 +12,28 @@ using namespace std;
 
 int main()
 {
+  srand( time( NULL ) );
+  vector<Ball> balls;
+  for (int i = 0; i < 16; ++i) {
+    Ball new_ball(0, 0);
+    bool valid_ball = true;
+    do {
+      valid_ball = true;
+      new_ball = generate_random_ball();
+      for (int j = 0; j < balls.size(); ++j) {
+        if (!balls_far_enough_apart(new_ball, balls[j])) {
+          valid_ball = false;
+          break;
+        }
+      }
+    } while (!valid_ball);
+    balls.push_back(new_ball);
+  }
   initialize(
-    Ball(4, 3), /* Cue ball */
-    Ball(1, 4), /* Eight ball */
-    {Ball(2, 1), Ball(1, 1), Ball(4, 2), Ball(3, 1), Ball(4, 1), Ball(5, 1), Ball(6, 1)}, /* Player balls */
-    {Ball(1, 0), Ball(1, 0), Ball(1, 0), Ball(1, 0), Ball(1, 0), Ball(1, 0), Ball(1, 0)} /* Opponent balls */
+    balls[0], /* Cue ball */
+    balls[1], /* Eight ball */
+    {balls[2], balls[3], balls[4], balls[5], balls[6], balls[7], balls[8]}, /* Player balls */ //
+    {balls[9], balls[10], balls[11], balls[12], balls[13], balls[14]} /* Opponent balls */
   );
   populate_tables();
   cout << "Population finished" << endl;

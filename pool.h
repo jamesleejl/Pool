@@ -215,7 +215,7 @@ RailIntersection get_rail_intersection(Vector2d start, Vector2d end);
 Vector2d apply_reflection(Vector2d point, Edge edge);
 /**
  * This function reflects the given path across the table rails and returns the
- * new path.
+ * new path. If the path is empty, then it is impossible.
  *
  * path is a sequence of points defining a path which starts at the first
  * Vector2d, travels in a straight line to the next, etc.
@@ -240,13 +240,52 @@ void process_object_ball_combinations(int num_object_balls, int num_elements);
  * numbers returned are '2' and '3'.
  */
 set<short> get_set_from_combination(int n, int combo);
-
 /**
  * Gets all the integral coordinates of every integral x value along the line
  * segment running from start to end. The y coordinates are rounded.
  */
 vector<Coordinates> get_coordinates_between_points(Vector2d start, Vector2d end);
-
+/**
+ * Converts the speed (in m/s) to distance traveled in units.
+ */
+double speed_to_distance(double speed);
+/**
+ * Converts the speed (in m/s) of the cue ball to the speed of the object ball (in m/s). shot_angle is in radians.
+ * The angle of the shot. Represents the angle from the the initial cue ball path to the final object ball path.
+ * Counterclockwise is positive.
+ */
+double cue_ball_speed_to_object_ball_speed(double speed, double shot_angle);
+/**
+ * The angle between the x-axis and the line given the slope. The angle is positive when the slope is positive.
+ */
+double slope_to_angle(double slope);
+/**
+ * Gets the angle between a given angle and the edge specified. This is always positive. The angle given is
+ * computed from slope_to_angle and represents the angle of a line to the x-axis.
+ */
+double absolute_angle_to_edge(double angle, Edge edge);
+/**
+ * The scaling factor to apply to ball paths after reflection from a rail given an angle to the given rail edge.
+ */
+double rail_path_scaling_factor_given_absolute_angle_to_edge(double absolute_angle_to_edge);
+/**
+ * Given a point, reflect it in the x-axis.
+ */
+Vector2d reflect_point_in_x_axis(const Vector2d& point);
+/**
+ * Given a point, reflect it in the y-axis.
+ */
+Vector2d reflect_point_in_y_axis(const Vector2d& point);
+/**
+ * Generates random ball coordinates
+ * TODO: Unit test.
+ */
+Ball generate_random_ball();
+/**
+ * Returns whether the balls are far enough apart. That is, they must be at least BALL_DIAMETER apart.
+ * TODO: Unit test.
+ */
+bool balls_far_enough_apart(const Ball& ball1, const Ball& ball2);
 // -------------------------- Relies on player_balls population --------------------------------------------
 // Player balls is populated with the eight ball at position 0 and all other balls from position 1 onwards.
 /**
@@ -313,7 +352,8 @@ double get_effective_pocket_size(const Vector2d &ghost_ball, const Pocket& pocke
  */
 double get_shot_angle(const Vector2d &cue_ball, const Vector2d &ghost_ball, const Pocket& pocket);
 /**
- * Gets the cue ball path for the given shot, strength, and spin.
+ * Gets the cue ball path for the given shot, strength, and spin. The first element is the initial
+ * cue ball position. Each subsequent vector is a directional vector to apply as a transform.
  * Relies on: {@code pockets}, {@code player_balls}, {@code bottom_edge}, {@code left_edge},
  * {@code right_edge}, {@code top_edge}, {@code eight_ball}, {@code opponent_balls},
  * {@code player_ball_to_pocket_obstructions_table}, {@code ghost_ball_position_table}, {@code shot_table}.
@@ -342,5 +382,15 @@ string get_json_for_solution();
  * Writes the string to the default filename defined in constants.
  */
 void write_to_file(string json);
+/**
+ * Given a object ball speed (in m/s), calculate whether the ball can be shot into the given pocket.
+ */
+bool get_object_ball_shot_possible_from_object_ball_speed(double object_ball_speed, const Vector2d& ball, const Pocket& pocket);
+/**
+ * Given a cue ball speed (in m/s), and a shot angle, calculate whether the ball can be shot into the given pocket. Shot angle in radians.
+ * The angle of the shot. Represents the angle from the the initial cue ball path to the final object ball path.
+ * Counterclockwise is positive.
+ */
+bool get_object_ball_shot_possible_from_cue_ball_speed(double cue_ball_speed, double shot_angle, const Vector2d& ball, const Pocket& pocket);
 
 #endif

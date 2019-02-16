@@ -35,6 +35,61 @@ protected:
   EXPECT_NEAR(vec1.x(), vec2.x(), EPSILON);\
   EXPECT_NEAR(vec1.y(), vec2.y(), EPSILON);\
 }
+
+TEST_F(PoolTest, PoolTest_ReflectPointInXAxis) {
+  EXPECT_VEC2D_EQ(Vector2d(5, -3), reflect_point_in_x_axis(Vector2d(5, 3)));
+}
+
+TEST_F(PoolTest, PoolTest_ReflectPointInYAxis) {
+  EXPECT_VEC2D_EQ(Vector2d(5, -3), reflect_point_in_y_axis(Vector2d(-5, -3)));
+}
+
+TEST_F(PoolTest, RailPathScalingFactorGivenAbsoluteAngleToEdge) {
+  EXPECT_DOUBLE_EQ(0.66666760921353452, rail_path_scaling_factor_given_absolute_angle_to_edge(1.0472));
+}
+
+TEST_F(PoolTest, AbsoluteAngleToEdge) {
+  EXPECT_DOUBLE_EQ(0.523599, absolute_angle_to_edge(0.523599, Edge::TOP));
+  EXPECT_DOUBLE_EQ(0.523599, absolute_angle_to_edge(-0.523599, Edge::BOTTOM));
+  EXPECT_DOUBLE_EQ(1.0471973267948966, absolute_angle_to_edge(0.523599, Edge::LEFT));
+  EXPECT_DOUBLE_EQ(1.0471973267948966, absolute_angle_to_edge(0.523599, Edge::RIGHT));
+
+}
+TEST_F(PoolTest, SpeedToDistance) {
+  EXPECT_DOUBLE_EQ(0.81928342741577331, speed_to_distance(0.50507635480427271));
+  EXPECT_DOUBLE_EQ(3.2115899859386148, speed_to_distance(1));
+  EXPECT_DOUBLE_EQ(28.904309873447531, speed_to_distance(3));
+}
+
+TEST_F(PoolTest, GetObjectBallShotPossibleFromObjectBallSpeed) {
+  EXPECT_TRUE(get_object_ball_shot_possible_from_object_ball_speed(
+    1,
+    Vector2d(3.1115899859386148, 0), pockets[0]));
+  EXPECT_FALSE(get_object_ball_shot_possible_from_object_ball_speed(
+    1,
+    Vector2d(3.3115899859386148, 0), pockets[0]));
+}
+
+TEST_F(PoolTest, CueBallSpeedToObjectBallSpeed) {
+  EXPECT_DOUBLE_EQ(0.50507635480427271, cue_ball_speed_to_object_ball_speed(1, 0.785398));
+}
+
+TEST_F(PoolTest, SlopeToAngle) {
+  EXPECT_DOUBLE_EQ(0.52359877559829893, slope_to_angle(1 / sqrt(3)));
+  EXPECT_DOUBLE_EQ(-0.52359877559829893, slope_to_angle(-1 / sqrt(3)));
+}
+
+TEST_F(PoolTest, GetObjectBallShotPossibleFromCueBallSpeed) {
+  EXPECT_TRUE(get_object_ball_shot_possible_from_cue_ball_speed(
+    1,
+    0.785398,
+    Vector2d(0.7, 0), pockets[0]));
+  EXPECT_FALSE(get_object_ball_shot_possible_from_cue_ball_speed(
+    1,
+    0.785398,
+    Vector2d(0.9, 0), pockets[0]));
+}
+
 TEST_F(PoolTest, GetCoordinatesBetweenPoints) {
   vector<Coordinates> coordinates =
     get_coordinates_between_points(Vector2d(-0.1, 0.1), Vector2d(9.9, 4.1));
@@ -52,11 +107,11 @@ TEST_F(PoolTest, GetCoordinatesBetweenPoints) {
 }
 
 TEST_F(PoolTest, GetSetFromCombination5) {
-  EXPECT_THAT(get_set_from_combination(3, 5), ElementsAre(0, 2));
+  EXPECT_THAT(get_set_from_combination(3, 5), ElementsAre(1, 3));
 }
 
 TEST_F(PoolTest, GetSetFromCombination) {
-  EXPECT_THAT(get_set_from_combination(3, 6), ElementsAre(1, 2));
+  EXPECT_THAT(get_set_from_combination(3, 6), ElementsAre(2, 3));
 }
 
 TEST_F(PoolTest, GenerateAllCombinations) {
@@ -69,7 +124,7 @@ TEST_F(PoolTest, GenerateAllCombinations) {
 TEST_F(PoolTest, GetPathWithNoIntersections) {
   vector<Vector2d> path;
   path.push_back(Vector2d(2, 12));
-  path.push_back(Vector2d(3, 15));
+  path.push_back(Vector2d(1, 3));
   vector<Vector2d> reflected_path = get_path_with_reflections(path);
   EXPECT_EQ(2, reflected_path.size());
   EXPECT_VEC2D_EQ(Vector2d(2, 12), reflected_path[0]);
@@ -79,17 +134,17 @@ TEST_F(PoolTest, GetPathWithNoIntersections) {
 TEST_F(PoolTest, GetPathWithReflections) {
   vector<Vector2d> path;
   path.push_back(Vector2d(2, 12));
-  path.push_back(Vector2d(0, 20));
-  path.push_back(Vector2d(36, 4));
+  path.push_back(Vector2d(-2, 8));
+  path.push_back(Vector2d(36, -16));
   vector<Vector2d> reflected_path = get_path_with_reflections(path);
-  EXPECT_EQ(8, reflected_path.size());
+  EXPECT_EQ(5, reflected_path.size());
   EXPECT_VEC2D_EQ(Vector2d(2, 12), reflected_path[0]);
   EXPECT_VEC2D_EQ(Vector2d(1.09, 15.64), reflected_path[1]);
   EXPECT_VEC2D_EQ(Vector2d(0.36, 12.72), reflected_path[2]);
-  EXPECT_VEC2D_EQ(Vector2d(0.72, 11.28), reflected_path[3]);
-  EXPECT_VEC2D_EQ(Vector2d(0.36, 12.72), reflected_path[4]);
-  EXPECT_VEC2D_EQ(Vector2d(7.5075824175824168, 15.64), reflected_path[5]);
-  EXPECT_VEC2D_EQ(Vector2d(31.64, 5.7811896745230076), reflected_path[6]);
+  EXPECT_VEC2D_EQ(Vector2d(0.43473491346130316, 12.421060346154787), reflected_path[3]);
+  EXPECT_VEC2D_EQ(Vector2d(0.36, 11.440000000000001), reflected_path[4]);
+  EXPECT_VEC2D_EQ(Vector2d(9.8099999999999987, 15.640000000000001), reflected_path[5]);
+  EXPECT_VEC2D_EQ(Vector2d(31.64, 5.9377777777777787), reflected_path[6]);
   EXPECT_VEC2D_EQ(Vector2d(27.28, 4), reflected_path[7]);
 }
 
@@ -249,8 +304,8 @@ TEST_F(PoolTest, GetCueBallPath)
   vector<Vector2d> cue_ball_path = get_cue_ball_path(shot_table[9][12][1][0], 9, Spin::HEAVY_FOLLOW);
   EXPECT_EQ(3, cue_ball_path.size());
   EXPECT_VEC2D_EQ(Vector2d(8.5091168824543146, 8.5091168824543146), cue_ball_path[0]);
-  EXPECT_VEC2D_EQ(Vector2d(27.243889307579117, -21.344478715891714), cue_ball_path[1]);
-  EXPECT_VEC2D_EQ(Vector2d(44.368176295062106, -65.643628781127632), cue_ball_path[2]);
+  EXPECT_VEC2D_EQ(Vector2d(18.734772425124802, -29.853595598346029), cue_ball_path[1]);
+  EXPECT_VEC2D_EQ(Vector2d(17.124286987482993, -44.299150065235921), cue_ball_path[2]);
 }
 
 TEST_F(PoolTest, Square) {

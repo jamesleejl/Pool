@@ -12,6 +12,8 @@
 #include <limits>
 #include "./json.hpp"
 #include <math.h>
+#include <random>
+
 using namespace std;
 using json = nlohmann::json;
 
@@ -31,12 +33,61 @@ vector<vector<vector<vector<Shot>>>> shot_table;
 vector<vector<vector<vector<vector<vector<PostShot>>>>>> post_shot_table;
 vector<vector<vector<SelectedShot>>> selected_shot_table;
 
+bool balls_far_enough_apart(const Ball& ball1, const Ball& ball2) {
+  return (ball2.to_vec2d() - ball1.to_vec2d()).norm() > UNITS_PER_DIAMOND / 2;
+}
+
+Ball generate_random_ball() {
+  double random_width = ((double)rand() / (double)(RAND_MAX)) * 4;
+  double random_length = ((double)rand() / (double)(RAND_MAX)) * 8;
+  return Ball(random_length, random_width);
+}
+
+Vector2d reflect_point_in_x_axis(const Vector2d& point) {
+  return Vector2d(point.x(), -1 * point.y());
+}
+
+Vector2d reflect_point_in_y_axis(const Vector2d& point) {
+  return Vector2d(-1 * point.x(), point.y());
+}
+
+double rail_path_scaling_factor_given_absolute_angle_to_edge(double absolute_angle_to_edge) {
+  return 1.0 / (cos(absolute_angle_to_edge) + 1);
+}
+
+double absolute_angle_to_edge(double angle, Edge edge) {
+  double absolute_angle = fabs(angle);
+  if (edge == Edge::TOP || edge == Edge::BOTTOM) {
+    return absolute_angle;
+  }
+  return M_PI / 2 - absolute_angle;
+}
+
+double slope_to_angle(double slope) {
+  return atan(slope);
+}
+
 void write_to_file(string json)
 {
   ofstream myfile;
   myfile.open(GAME_DATA_FILE);
   myfile << "game_data = " << json << "\n";
   myfile.close();
+}
+
+Coordinates get_ball_in_hand_solution() {
+  short combo = (short)pow(2, player_balls_without_eight_ball.size()) - 1;
+  double difficulty = std::numeric_limits<double>::infinity();
+  Coordinates ret(-1, -1);
+  for (int l = 0; l <= LENGTH; ++l) {
+    for (int w = 0; w <= WIDTH; ++w) {
+      if (selected_shot_table[l][w][combo].get_possible() && selected_shot_table[l][w][combo].get_total_weighted_difficulty() < difficulty) {
+        difficulty = selected_shot_table[l][w][combo].get_total_weighted_difficulty();
+        ret = Coordinates(l, w);
+      }
+    }
+  }
+  return ret;
 }
 
 // TODO: Test
@@ -46,7 +97,8 @@ string get_json_for_solution()
 
   short combo = (short)pow(2, player_balls_without_eight_ball.size()) - 1;
 
-  Coordinates coords(round(cue_ball.x()), round(cue_ball.y()));
+  // Coordinates coords(round(cue_ball.x()), round(cue_ball.y())); TODO: Uncomment for non ball in hand.
+  Coordinates coords = get_ball_in_hand_solution();
 
   short shot_number = 1;
   game_data["ball_in_hand"] = false;
@@ -81,9 +133,7 @@ string get_json_for_solution()
       coords_y = WIDTH;
     }
     coords = Coordinates(coords_x, coords_y);
-    cout << coords.get_x() << " " << coords.get_y() << " " << combo << endl;
     SelectedShot selected_shot = selected_shot_table[coords.get_x()][coords.get_y()][combo];
-    cout << "HERE" << endl;
     if (!selected_shot.get_possible())
     {
       return game_data.dump();
@@ -213,8 +263,8 @@ void populate_single_combination_in_selected_shot_table(int combo, set<short> &b
               // TODO Missed shots are all equally likely.
               // TODO: Fix this algorithm for imperfect shots.
               vector<Coordinates> possible_cue_ball_locations;
-              if (st != 0) {
-                PostShot &post_shot_short = post_shot_table[l][w][ball][p][st - 1][sp];
+              if (st >= 2) {
+                PostShot &post_shot_short = post_shot_table[l][w][ball][p][st - 2][sp];
                 if (!post_shot_short.get_possible()) {
                   continue;
                 }
@@ -331,21 +381,31 @@ vector<Vector2d> get_path_with_reflections(vector<Vector2d> path) {
     return path;
   }
   vector<Vector2d> path_with_reflections;
+  vector<Vector2d> empty_path;
   Vector2d start = path[0];
   path_with_reflections.push_back(start);
   for (unsigned int i = 1; i < path.size(); ++i) {
-    Vector2d end = path[i];
+    Vector2d end = start + path[i];
     do {
       RailIntersection rail_intersection = get_rail_intersection(start, end);
+      if (!rail_intersection.get_possible()) {
+        return empty_path;
+      }
       if (!rail_intersection.has_intersection()) {
         path_with_reflections.push_back(end);
+        start = end;
         break;
       }
       start = rail_intersection.get_intersection_point();
       path_with_reflections.push_back(start);
-      end = apply_reflection(end, rail_intersection.get_intersection_edge());
+      end = start + rail_intersection.get_end_vector();
       for (unsigned int j = i + 1; j < path.size(); ++j) {
-        path[j] = apply_reflection(path[j], rail_intersection.get_intersection_edge());
+        if (rail_intersection.get_intersection_edge() == Edge::TOP || rail_intersection.get_intersection_edge() == Edge::BOTTOM) {
+          path[j] = reflect_point_in_x_axis(path[j]);
+        } else {
+          path[j] = reflect_point_in_y_axis(path[j]);
+        }
+        path[j] = path[j] * rail_intersection.get_scaling_factor();
       }
    } while (true);
   }
@@ -366,10 +426,12 @@ Vector2d apply_reflection(Vector2d point, Edge edge) {
   return Vector2d(-1, -1);
 }
 
+// TODO: Test.
 RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
   RailIntersection ret;
   // Should still work even if m is NaN.
   double m = (end.y() - start.y()) / (end.x() - start.x());
+  double angle = slope_to_angle(m);
   // Left side
   double left_edge_x = left_edge[0].x();
   if (end.x() < (left_edge_x - EPSILON)) {
@@ -377,7 +439,13 @@ RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
     if (intersection_y >= bottom_edge[0].y() && intersection_y <= top_edge[0].y()) {
       ret.set_has_intersection(true);
       ret.set_intersection_point(Vector2d(left_edge_x, intersection_y));
+      if (intersection_y >= from_diamonds(4 - 0.25) || intersection_y <= from_diamonds(0.25)) {
+        ret.set_possible(false);
+      }
       ret.set_intersection_edge(Edge::LEFT);
+      double scaling_factor = rail_path_scaling_factor_given_absolute_angle_to_edge(absolute_angle_to_edge(angle, Edge::LEFT));
+      ret.set_end_vector(reflect_point_in_y_axis(Vector2d(end - ret.get_intersection_point())) * scaling_factor);
+      ret.set_scaling_factor(scaling_factor);
       return ret;
     }
   }
@@ -388,7 +456,13 @@ RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
     if (intersection_y >= bottom_edge[0].y() && intersection_y <= top_edge[0].y()) {
       ret.set_has_intersection(true);
       ret.set_intersection_point(Vector2d(right_edge_x, intersection_y));
+      if (intersection_y >= from_diamonds(4 - 0.25) || intersection_y <= from_diamonds(0.25)) {
+        ret.set_possible(false);
+      }
       ret.set_intersection_edge(Edge::RIGHT);
+      double scaling_factor = rail_path_scaling_factor_given_absolute_angle_to_edge(absolute_angle_to_edge(angle, Edge::RIGHT));
+      ret.set_end_vector(reflect_point_in_y_axis(Vector2d(end - ret.get_intersection_point())) * scaling_factor);
+      ret.set_scaling_factor(scaling_factor);
       return ret;
     }
   }
@@ -399,7 +473,13 @@ RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
     if (intersection_x >= left_edge[0].x() && intersection_x <= right_edge[0].x()) {
       ret.set_has_intersection(true);
       ret.set_intersection_point(Vector2d(intersection_x, bottom_edge_y));
+      if (intersection_x >= from_diamonds(8 - 0.25) || intersection_x <= from_diamonds(0.25) || (intersection_x >= from_diamonds(4 - 0.25) && intersection_x <= from_diamonds(4 + 0.25))) {
+        ret.set_possible(false);
+      }
       ret.set_intersection_edge(Edge::BOTTOM);
+      double scaling_factor = rail_path_scaling_factor_given_absolute_angle_to_edge(absolute_angle_to_edge(angle, Edge::BOTTOM));
+      ret.set_end_vector(reflect_point_in_x_axis(Vector2d(end - ret.get_intersection_point())) * scaling_factor);
+      ret.set_scaling_factor(scaling_factor);
       return ret;
     }
   }
@@ -410,7 +490,13 @@ RailIntersection get_rail_intersection(Vector2d start, Vector2d end) {
     if (intersection_x >= left_edge[0].x() && intersection_x <= right_edge[0].x()) {
       ret.set_has_intersection(true);
       ret.set_intersection_point(Vector2d(intersection_x, top_edge_y));
+      if (intersection_x >= from_diamonds(8 - 0.25) || intersection_x <= from_diamonds(0.25) || (intersection_x >= from_diamonds(4 - 0.25) && intersection_x <= from_diamonds(4 + 0.25))) {
+        ret.set_possible(false);
+      }
       ret.set_intersection_edge(Edge::TOP);
+      double scaling_factor = rail_path_scaling_factor_given_absolute_angle_to_edge(absolute_angle_to_edge(angle, Edge::TOP));
+      ret.set_end_vector(reflect_point_in_x_axis(Vector2d(end - ret.get_intersection_point())) * scaling_factor);
+      ret.set_scaling_factor(scaling_factor);
       return ret;
     }
   }
@@ -497,18 +583,34 @@ vector<Vector2d> get_cue_ball_path(const Shot& shot, short strength, Spin spin) 
   Vector2d final_velocity_vector = Vector2d(
     x_multiplier * 5 * v * sin_phi * cos_phi / 7,
     (5 * v * square(sin_phi) - 2 * BALL_RADIUS_IN_METERS * w) / 7);
-  double roll_distance = square(final_velocity_vector.norm()) / (2 * u_times_g);
+  double roll_distance = speed_to_distance(final_velocity_vector.norm());
   Vector2d final_trajectory_vector = final_velocity_vector.normalized() * roll_distance;
   final_trajectory_vector = rotation * final_trajectory_vector;
-  final_trajectory_vector *= DIAMONDS_PER_METER * UNITS_PER_DIAMOND;
   Vector2d cue_ball_position = shot.get_ghost_ball()->get_coords();
   ret.push_back(cue_ball_position);
-  cue_ball_position += curved_trajectory_vector;
-  ret.push_back(cue_ball_position);
-  cue_ball_position += final_trajectory_vector;
-  ret.push_back(cue_ball_position);
+  ret.push_back(curved_trajectory_vector);
+  ret.push_back(final_trajectory_vector);
   return ret;
 }
+
+double speed_to_distance(double speed) {
+  return square(speed) * DIAMONDS_PER_METER * UNITS_PER_DIAMOND / (2 * U * G);
+}
+
+bool get_object_ball_shot_possible_from_object_ball_speed(double object_ball_speed, const Vector2d& ball, const Pocket& pocket) {
+  double distance = speed_to_distance(object_ball_speed);
+  return (pocket.get_position() - ball).norm() <= distance;
+}
+
+// TODO: Possibly wrong.
+bool get_object_ball_shot_possible_from_cue_ball_speed(double cue_ball_speed, double shot_angle, const Vector2d& ball, const Pocket& pocket) {
+  return get_object_ball_shot_possible_from_object_ball_speed(cue_ball_speed_to_object_ball_speed(cue_ball_speed, shot_angle), ball, pocket);
+}
+
+double cue_ball_speed_to_object_ball_speed(double speed, double shot_angle) {
+  return 5 * speed * cos(shot_angle) / 7;
+}
+
 
 /**
  * Populates the cue ball paths after a shot is taken.
@@ -545,8 +647,17 @@ void populate_post_shot_table()
                 post_shot.set_impossible();
                 continue;
               }
-              post_shot.set_speed_type(speed_to_speed_type(strength_to_speed(st)));
+              double cue_ball_speed = strength_to_speed(st);
+              if (!get_object_ball_shot_possible_from_cue_ball_speed(cue_ball_speed, shot.get_shot_angle(), player_balls[o], pockets[p])) {
+                post_shot.set_impossible();
+                continue;
+              }
+              post_shot.set_speed_type(speed_to_speed_type(cue_ball_speed));
               vector<Vector2d> cue_ball_path = get_path_with_reflections(get_cue_ball_path(shot, st, (Spin) sp));
+              if (cue_ball_path.size() == 0) {
+                post_shot.set_impossible();
+                continue;
+              }
               post_shot.set_cue_ball_path(cue_ball_path);
               for (unsigned int i = 1; i < cue_ball_path.size(); ++i) {
                 BallObstructions cue_ball_path_obstructions =
@@ -1017,47 +1128,35 @@ void populate_tables() {
   auto end = chrono::system_clock::now();
   chrono::duration<double> elapsed_seconds = end - start;
   time_t end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_player_ball_to_pocket_obstructions_table at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_ghost_ball_position_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
   end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_ghost_ball_position_table at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_obstructions();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
   end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_shot_table_obstructions at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_difficulty();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
   end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_shot_table_difficulty at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_post_shot_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
   end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_post_shot_table at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_selected_shot_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
   end_time = chrono::system_clock::to_time_t(end);
-  cout << endl
-            << "finished populate_selected_shot_table at " << ctime(&end_time)
-            << "elapsed time: " << elapsed_seconds.count() << "s\n";
+  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 }

@@ -50,6 +50,8 @@
   </div>
   <script src="game_data.js"></script>
   <script>
+    game_data["object_balls"] = game_data["object_balls"] || {};
+    game_data["opponent_object_balls"] = game_data["opponent_object_balls"] || {};
     // Constants and variables ------------------------------------------------------
 
     /** The radius of a pool ball in terms of diamonds. */
@@ -86,8 +88,6 @@
     let opponent_object_ball_imgs = []
     let current_turn = 0
     let context;
-    // TODO: This is hacky.
-    let flipped = false
 
     render_next_shot = false
 
@@ -172,12 +172,12 @@
      * @param {array<number>} end an array of length two representing the end coordinates.
      * @param {string} color the html string representing the color of the line.
      */
-    function draw_line(context, start, end, color) {
+    function game_draw_line(context, start, end, color) {
       new Line(
         convert_diamonds_to_canvas_units(start[0]),
-        convert_diamonds_to_canvas_units(start[1]),
+        convert_diamonds_to_canvas_units(4 - start[1]),
         convert_diamonds_to_canvas_units(end[0]),
-        convert_diamonds_to_canvas_units(end[1]))
+        convert_diamonds_to_canvas_units(4 - end[1]))
           .drawWithArrowheads(context, color);
     }
 
@@ -193,8 +193,8 @@
         convert_diamonds_to_canvas_units(y_in_diamonds))
     }
 
-    function render_ball(context, img, x_in_diamonds, y_in_diamonds) {
-      render_img(context, img, x_in_diamonds - BALL_RADIUS_IN_DIAMONDS, y_in_diamonds - BALL_RADIUS_IN_DIAMONDS)
+    function game_render_ball(context, img, x_in_diamonds, y_in_diamonds) {
+      render_img(context, img, x_in_diamonds - BALL_RADIUS_IN_DIAMONDS, 4 - (y_in_diamonds + BALL_RADIUS_IN_DIAMONDS))
     }
 
     function add_to_sunk_object_balls(object_ball) {
@@ -238,8 +238,6 @@
 
     for (let i = 0; i < game_data["object_balls"].length; ++i) {
       object_ball_imgs.push(create_img(object_ball_to_image(i)))
-      console.log(i)
-      console.log(object_ball_imgs[i])
     }
     for (let i = 0; i < game_data["opponent_object_balls"].length; ++i) {
       opponent_object_ball_imgs.push(create_img(opponent_object_ball_to_image(i)))
@@ -267,42 +265,38 @@
     }
     function render_current_turn() {
       context = canvas.getContext('2d')
-      if (!flipped) {
-        context.transform(1, 0, 0, -1, 0, canvas.height)
-        flipped = true
-      }
 
       // clear
       context.clearRect(0, 0, canvas.width, canvas.height)
-      let turn_data = game_data["turns"][current_turn]
-
-      document.getElementById('strength').innerHTML = turn_data["strength"]
-      document.getElementById('spin').innerHTML = spin_string(turn_data["spin"])
-      document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
-      document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)
-      render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
       for (let i = 0; i < game_data["object_balls"].length; ++i) {
         if (sunk_object_balls.has(i)) {
           continue
         }
-        render_ball(
+        game_render_ball(
           context,
           object_ball_imgs[i],
           game_data["object_balls"][i][0],
           game_data["object_balls"][i][1])
       }
       for (let i = 0; i < game_data["opponent_object_balls"].length; ++i) {
-        render_ball(
+        game_render_ball(
           context,
           opponent_object_ball_imgs[i],
           game_data["opponent_object_balls"][i][0],
           game_data["opponent_object_balls"][i][1])
       }
-      draw_line(context, turn_data["cue_ball"], turn_data["path"][0], "white")
+      let turn_data = game_data["turns"][current_turn]
+
+      document.getElementById('strength').innerHTML = turn_data["strength"]
+      document.getElementById('spin').innerHTML = spin_string(turn_data["spin"])
+      document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
+      document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)
+      game_render_ball(context, cue_ball_img, turn_data["cue_ball"][0], turn_data["cue_ball"][1])
+      game_draw_line(context, turn_data["cue_ball"], turn_data["path"][0], "white")
       let object_ball = game_data["object_balls"][turn_data["object_ball_index"]]
-      draw_line(context, object_ball, turn_data["pocket_coords"], object_ball_index_to_color(turn_data["object_ball_index"]))
+      game_draw_line(context, object_ball, turn_data["pocket_coords"], object_ball_index_to_color(turn_data["object_ball_index"]))
       for (let i = 0; i < turn_data["path"].length - 1; ++i) {
-        draw_line(context, turn_data["path"][i], turn_data["path"][i + 1], "white")
+        game_draw_line(context, turn_data["path"][i], turn_data["path"][i + 1], "white")
       }
     }
 
@@ -311,21 +305,21 @@
         return "#000000"
       }
       switch (idx) {
-        case 0:
-          return "#f9e040"
         case 1:
-          return "#3b4cb4"
+          return "#f9e040"
         case 2:
-          return "#f2292b"
+          return "#3b4cb4"
         case 3:
-          return "#b65299"
+          return "#f2292b"
         case 4:
-          return "#e49439"
+          return "#b65299"
         case 5:
-          return "#007b2b"
+          return "#e49439"
         case 6:
-          return "#6d373c"
+          return "#007b2b"
         case 7:
+          return "#6d373c"
+        case 0:
           return "#000000"
       }
     }

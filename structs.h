@@ -72,7 +72,7 @@ struct Ball
   public:
     Ball(double x, double y) : x_(x), y_(y) {}
     Vector2d to_vec2d() const {
-      return Vector2d(from_diamonds(x_), from_diamonds(y_));
+      return move_ball_in_from_rails(Vector2d(from_diamonds(x_), from_diamonds(y_)));
     }
   private:
     double x_;
@@ -145,7 +145,7 @@ struct Shot
     void set_impossible() {
       possible_ = false;
     }
-    Vector2d get_cue_ball_to_ghost_ball() const {
+    const Vector2d& get_cue_ball_to_ghost_ball() const {
       return cue_ball_to_ghost_ball_;
     }
     void set_cue_ball_to_ghost_ball(const Vector2d& cue_ball_to_ghost_ball) {
@@ -300,10 +300,10 @@ struct PostShot
       cue_ball_path_ = cue_ball_path;
       final_position_ = cue_ball_path[cue_ball_path.size() - 1];
     }
-    vector<Vector2d> get_cue_ball_path() const {
+    const vector<Vector2d>& get_cue_ball_path() const {
       return cue_ball_path_;
     }
-    Vector2d get_final_position() {
+    const Vector2d& get_final_position() {
       return final_position_;
     }
     Speed get_speed_type() const {
@@ -312,7 +312,7 @@ struct PostShot
     void set_speed_type(Speed speed_type) {
       speed_type_ = speed_type;
     }
-    BallObstructions get_obstructions() const {
+    const BallObstructions& get_obstructions() const {
       return obstructions_;
     }
     void add_player_balls_to_obstructions(const set<short> obstructing_player_balls) {
@@ -361,17 +361,24 @@ struct RailIntersection
 {
   public:
     RailIntersection() :
-      has_intersection_(false) {}
+      has_intersection_(false),
+      possible_(true) {}
     void set_has_intersection(bool has_intersection) {
       has_intersection_ = has_intersection;
     }
     bool has_intersection() const {
       return has_intersection_;
     }
+    void set_possible(bool possible) {
+      possible_ = possible;
+    }
+    bool get_possible() const {
+      return possible_;
+    }
     void set_intersection_point(const Vector2d& intersection_point) {
       intersection_point_ = intersection_point;
     }
-    Vector2d get_intersection_point() const {
+    const Vector2d& get_intersection_point() const {
       return intersection_point_;
     }
     Edge get_intersection_edge() const {
@@ -380,11 +387,27 @@ struct RailIntersection
     void set_intersection_edge(Edge intersection_edge) {
       intersection_edge_ = intersection_edge;
     }
+    void set_scaling_factor(double scaling_factor) {
+      scaling_factor_ = scaling_factor;
+    }
+    double get_scaling_factor() {
+      return scaling_factor_;
+    }
+    void set_end_vector(const Vector2d& end_vector) {
+      end_vector_ = end_vector;
+    }
+    const Vector2d& get_end_vector() const {
+      return end_vector_;
+    }
   private:
     /**
      * Whether or not the path intersects with the rail or not.
      */
     bool has_intersection_;
+    /**
+     * Whether the shot is possible or not. If it intersects a pocket, it is not.
+     */
+    bool possible_;
     /**
      * The intersection point with the rail.
      * Only populated if has_intersection is true.
@@ -394,6 +417,16 @@ struct RailIntersection
      * Which edge of the pool table the path intersects with.
      */
     Edge intersection_edge_;
+    /**
+     * Scaling factor to apply to future segments on the path.
+     */
+    double scaling_factor_;
+    /**
+     * The vector on the path from the intersection point to the new end
+     * coordinate after reflection. This is relative to the intersection
+     * point.
+     */
+    Vector2d end_vector_;
 };
 
 /**
@@ -458,7 +491,7 @@ struct SelectedShot
     void set_cue_ball_path(const vector<Vector2d>& cue_ball_path) {
       cue_ball_path_ = cue_ball_path;
     }
-    vector<Vector2d> get_cue_ball_path() const {
+    const vector<Vector2d>& get_cue_ball_path() const {
       return cue_ball_path_;
     }
     void set_expected_cue_ball_final_position(const Vector2d& expected_cue_ball_final_position) {

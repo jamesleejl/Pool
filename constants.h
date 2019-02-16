@@ -77,7 +77,7 @@ const double MIN_CUE_BALL_SPEED = 0.3;
 /**
  * The maximum speed shot to consider. (In meters/second)
  */
-const double MAX_CUE_BALL_SPEED = 8;
+const double MAX_CUE_BALL_SPEED = 6;
 /**
  * The coefficient of friction of the cue ball table. Used in physics calculations.
  */
