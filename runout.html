@@ -43,9 +43,10 @@
     <div class="shot_info">
       <div>Use left and right arrow keys to select shots.</div>
       <div>Shot Difficulty: <span id="shot_difficulty"></span></div>
-      <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
+      <div>Shot Angle: <span id="shot_angle"></span></div>
       <div>Strength: <span id="strength"></span></div>
       <div>Spin: <span id="spin"></span></div>
+      <div>Remaining Difficulty: <span id="remaining_difficulty"></span></div>
     </div>
   </div>
   <script src="game_data.js"></script>
@@ -288,6 +289,7 @@
       let turn_data = game_data["turns"][current_turn]
 
       document.getElementById('strength').innerHTML = turn_data["strength"]
+      document.getElementById('shot_angle').innerHTML = Math.round(Math.abs(turn_data["shot_angle_in_degrees"]))
       document.getElementById('spin').innerHTML = spin_string(turn_data["spin"])
       document.getElementById('remaining_difficulty').innerHTML = Math.round(turn_data["runout_difficulty"] / 1000)
       document.getElementById('shot_difficulty').innerHTML = Math.round(turn_data["shot_difficulty"] / 1000)

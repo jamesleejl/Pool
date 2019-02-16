@@ -36,9 +36,6 @@ int main()
     {balls[9], balls[10], balls[11], balls[12], balls[13], balls[14]} /* Opponent balls */
   );
   populate_tables();
-  cout << "Population finished" << endl;
   string solution = get_json_for_solution();
-  cout << solution << endl;
   write_to_file(solution);
-  cout << "Finished" << endl;
 }

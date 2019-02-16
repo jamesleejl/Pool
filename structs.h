@@ -284,6 +284,9 @@ struct PostShot
     void set_shot(const Shot* shot) {
       shot_ = shot;
     }
+    const Shot& get_shot() const {
+      return *shot_;
+    }
     void set_shot_difficulty(double shot_difficulty) {
       shot_difficulty_ = shot_difficulty;
     }
@@ -443,9 +446,16 @@ struct SelectedShot
       pocket_(0),
       total_weighted_difficulty_(std::numeric_limits<double>::infinity()),
       current_weighted_difficulty_(std::numeric_limits<double>::infinity()),
+      shot_angle_in_degrees_(0),
       cue_ball_final_position_x_coordinate_(0),
       cue_ball_final_position_y_coordinate_(0),
       next_combo_(0) {}
+    void set_shot_angle_in_degrees_(double shot_angle_in_degrees) {
+      shot_angle_in_degrees_ = shot_angle_in_degrees;
+    }
+    double get_shot_angle_in_degrees() {
+      return shot_angle_in_degrees_;
+    }
     void set_possible(bool possible) {
       possible_ = possible;
     }
@@ -550,6 +560,10 @@ struct SelectedShot
      * Only populated if possible is true.
      */
     double current_weighted_difficulty_;
+    /**
+     * The angle of the shot in degrees.
+     */
+    double shot_angle_in_degrees_;
     /**
      * The points defining the line segments the cue ball travels along after contact with the object ball.
      * Only populated if possible is true.

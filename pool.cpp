@@ -136,6 +136,7 @@ string get_json_for_solution()
     SelectedShot selected_shot = selected_shot_table[coords.get_x()][coords.get_y()][combo];
     if (!selected_shot.get_possible())
     {
+      cout << "No solution" << endl;
       return game_data.dump();
     }
     game_data["has_solution"] = true;
@@ -150,6 +151,7 @@ string get_json_for_solution()
     turn["shot_difficulty"] = selected_shot.get_current_weighted_difficulty();
     turn["strength"] = selected_shot.get_strength();
     turn["spin"] = selected_shot.get_spin();
+    turn["shot_angle_in_degrees"] = selected_shot.get_shot_angle_in_degrees();
 
     json path;
     for (unsigned short i = 0; i < selected_shot.get_cue_ball_path().size(); ++i)
@@ -167,6 +169,7 @@ string get_json_for_solution()
     combo = selected_shot.get_next_combo();
     shot_number += 1;
   } while (true);
+  cout << endl << (game_data["has_solution"] ? "Solution found!" : "No solution") << endl;
   return game_data.dump();
 }
 
@@ -191,6 +194,7 @@ void populate_eight_ball_in_selected_shot_table()
             }
             if (post_shot.get_weighted_shot_difficulty() < selected_shot.get_total_weighted_difficulty())
             {
+              selected_shot.set_shot_angle_in_degrees_(radians_to_degrees(post_shot.get_shot().get_shot_angle()));
               selected_shot.set_possible(true);
               selected_shot.set_strength(st);
               selected_shot.set_spin(sp);
@@ -292,6 +296,7 @@ void populate_single_combination_in_selected_shot_table(int combo, set<short> &b
               double total_weighted_difficulty = post_shot.get_weighted_shot_difficulty() + average_remaining_runout_weighted_difficulty;
               if (total_weighted_difficulty < selected_shot.get_total_weighted_difficulty())
               {
+                selected_shot.set_shot_angle_in_degrees_(radians_to_degrees(post_shot.get_shot().get_shot_angle()));
                 selected_shot.set_possible(true);
                 selected_shot.set_strength(st);
                 selected_shot.set_spin(sp);
@@ -328,7 +333,6 @@ set<short> get_set_from_combination(int n, int combo) {
  */
 void process_object_ball_combination(int num_object_balls, int combo)
 {
-  cout << combo << endl;
   set<short> balls = get_set_from_combination(num_object_balls, combo);
   populate_single_combination_in_selected_shot_table(combo, balls);
 }
@@ -1127,27 +1131,22 @@ void populate_tables() {
   populate_player_ball_to_pocket_obstructions_table();
   auto end = chrono::system_clock::now();
   chrono::duration<double> elapsed_seconds = end - start;
-  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_ghost_ball_position_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_obstructions();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_difficulty();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_post_shot_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_selected_shot_table();
   end = chrono::system_clock::now();
