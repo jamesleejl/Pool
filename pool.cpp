@@ -1127,36 +1127,30 @@ void populate_tables() {
   populate_player_ball_to_pocket_obstructions_table();
   auto end = chrono::system_clock::now();
   chrono::duration<double> elapsed_seconds = end - start;
-  time_t end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_ghost_ball_position_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_obstructions();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_shot_table_difficulty();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_post_shot_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 
   populate_selected_shot_table();
   end = chrono::system_clock::now();
   elapsed_seconds = end - start;
-  end_time = chrono::system_clock::to_time_t(end);
   cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
 }

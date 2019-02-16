@@ -14,7 +14,7 @@ int main()
 {
   srand( time( NULL ) );
   vector<Ball> balls;
-  for (int i = 0; i < 16; ++i) {
+  for (unsigned int i = 0; i < 16; ++i) {
     Ball new_ball(0, 0);
     bool valid_ball = true;
     do {
