@@ -20,7 +20,7 @@ int main()
     do {
       valid_ball = true;
       new_ball = generate_random_ball();
-      for (int j = 0; j < balls.size(); ++j) {
+      for (unsigned int j = 0; j < balls.size(); ++j) {
         if (!balls_far_enough_apart(new_ball, balls[j])) {
           valid_ball = false;
           break;
