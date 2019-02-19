@@ -69,10 +69,20 @@ double slope_to_angle(double slope) {
 
 void write_to_file(string json)
 {
+  ifstream inputfile;
+  inputfile.open("runout.html");
   ofstream myfile;
-  myfile.open(GAME_DATA_FILE);
-  myfile << "game_data = " << json << "\n";
+  myfile.open("generated_runout.html");
+  string input_line;
+  while(getline(inputfile, input_line)) {
+    if (input_line == "{{game_data}}") {
+      myfile << "<script>game_data = " << json << "\n</script>";
+    } else {
+      myfile << input_line << endl;
+    }
+  }
   myfile.close();
+  inputfile.close();
 }
 
 Coordinates get_ball_in_hand_solution() {

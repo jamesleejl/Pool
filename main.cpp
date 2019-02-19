@@ -36,7 +36,7 @@ int main()
       balls[0], /* Cue ball */
       balls[1], /* Eight ball */
       {balls[2], balls[3], balls[4], balls[5], balls[6], balls[7], balls[8]}, /* Player balls */ //
-      {balls[9], balls[10], balls[11], balls[12], balls[13], balls[14]} /* Opponent balls */
+      {balls[9], balls[10], balls[11], balls[12], balls[13], balls[14], balls[15]} /* Opponent balls */
     );
     populate_tables();
     solution = get_solution();
