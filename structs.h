@@ -624,4 +624,37 @@ struct Coordinates
     short y_;
 };
 
+/**
+ * Finds a solution and store it in a JSON string.
+ */
+struct Solution
+{
+  public:
+    Solution() :
+      solution_(""),
+      has_solution_(false) {}
+    void set_solution(string solution) {
+      solution_ = solution;
+    }
+    void set_has_solution(bool has_solution) {
+      has_solution_ = has_solution;
+    }
+    bool get_has_solution() const {
+      return has_solution_;
+    }
+    string get_solution() const {
+      return solution_;
+    }
+
+  private:
+    /**
+     * The JSON solution.
+     */
+    string solution_;
+    /**
+     * Whether there is a solutino or not.
+     */
+    bool has_solution_;
+};
+
 #endif

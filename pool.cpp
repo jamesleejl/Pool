@@ -91,8 +91,9 @@ Coordinates get_ball_in_hand_solution() {
 }
 
 // TODO: Test
-string get_json_for_solution()
+Solution get_solution()
 {
+  Solution solution;
   json game_data;
 
   short combo = (short)pow(2, player_balls_without_eight_ball.size()) - 1;
@@ -136,8 +137,9 @@ string get_json_for_solution()
     SelectedShot selected_shot = selected_shot_table[coords.get_x()][coords.get_y()][combo];
     if (!selected_shot.get_possible())
     {
-      cout << "No solution" << endl;
-      return game_data.dump();
+      solution.set_has_solution(false);
+      solution.set_solution(game_data.dump());
+      return solution;
     }
     game_data["has_solution"] = true;
     json turn;
@@ -169,8 +171,9 @@ string get_json_for_solution()
     combo = selected_shot.get_next_combo();
     shot_number += 1;
   } while (true);
-  cout << endl << (game_data["has_solution"] ? "Solution found!" : "No solution") << endl;
-  return game_data.dump();
+  solution.set_solution(game_data.dump());
+  solution.set_has_solution(game_data["has_solution"]);
+  return solution;
 }
 
 // TODO: Test.

@@ -19,6 +19,7 @@ struct PostShot;
 struct RailIntersection;
 struct SelectedShot;
 struct Coordinates;
+struct Solution;
 
 /**
  * The positions of the pockets.
@@ -374,10 +375,10 @@ void populate_post_shot_table();
  */
 void populate_selected_shot_table();
 /**
- * Prints out a json string representing the solution.
+ * Returns a solution if one exists.
  * Relies on everything.
  */
-string get_json_for_solution();
+Solution get_solution();
 /**
  * Writes the string to the default filename defined in constants.
  */
